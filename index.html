@@ -104,6 +104,12 @@ details summary{cursor:pointer;color:var(--sub);font-size:13px}
 .toast.on{opacity:.95}
 .field{margin:10px 0}.field label{display:block;font-size:13px;color:var(--sub);margin-bottom:3px}
 @media (max-width:640px){.hide-sm{display:none}.grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}}
+/* 圧迫暗記 */
+.ez{display:inline-block;font-size:10px;font-weight:700;line-height:15px;padding:0 4px;border-radius:4px;vertical-align:1px}
+.ez-e{background:var(--brands);color:var(--brand)}.ez-m{background:#ecebe6;color:#555}.ez-h{background:#f8e2de;color:rgb(var(--r))}
+.cd{font-size:44px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}.cd.low{color:rgb(var(--r))}
+.studytext{white-space:pre-wrap;word-break:break-all;font-size:18px;line-height:2;background:#fffdf5;border:1px solid var(--line);border-radius:10px;padding:14px;-webkit-user-select:none;user-select:none}
+.bar.cdb i{transition:width .25s linear}
 </style>
 </head>
 <body>
@@ -137,18 +143,22 @@ const DEFAULT_KINKI=[
  '助詞（てにをは）の誤りで主語・目的語・要件と効果の関係を変えない'
 ];
 function initState(){const t=now(),k={};DEFAULT_KINKI.forEach(x=>{const id=uid();k[id]={scope:'g',text:x,u:t}});
-  return {v:2,attempts:{},deleted:{},plan:{},overrides:{},kinki:k,settings:{threshold:90,ignorePunct:false,ignoreMarks:true,showHead:true,u:0}}}
+  return {v:2,attempts:{},pressure:{},deleted:{},plan:{},overrides:{},kinki:k,settings:{threshold:90,ignorePunct:false,ignoreMarks:true,showHead:true,u:0}}}
 let DATA=ld(K_DATA,null);
 let S=ld(K_STATE,null)||initState();
 const DEF_SET={threshold:90,ignorePunct:false,ignoreMarks:true,showHead:true,targetSpeed:40,examDate:'',minWeekday:60,minWeekend:120,horizon:14,learnRate:12};
-S.settings=Object.assign({},DEF_SET,S.settings);S.schedule=S.schedule||null;
-let C=Object.assign({model:'claude-sonnet-5-5',aiOn:true,apiKey:'',ghOwner:'',ghRepo:'',ghToken:'',device:'',view:'q'},ld(K_CONF,{}));
+S.settings=Object.assign({},DEF_SET,S.settings);S.schedule=S.schedule||null;S.pressure=S.pressure||{};
+let C=Object.assign({model:'claude-sonnet-5-5',aiOn:true,apiKey:'',ghOwner:'',ghRepo:'',ghToken:'',device:'',view:'q',pressAI:false,pSort:'hard'},ld(K_CONF,{}));
 let ITEMS=[],BYID={},QS=[],ATT={};
 function setData(d){DATA=d;ITEMS=d?d.items:[];BYID=Object.fromEntries(ITEMS.map(i=>[i.id,i]));
   const seen={};QS=[];ITEMS.forEach(i=>{if(!seen[i.q]){seen[i.q]={q:i.q,qt:i.qt,ch:i.ch,items:[]};QS.push(seen[i.q])}seen[i.q].items.push(i)})}
 setData(DATA);
 function reindex(){ATT={};for(const a of Object.values(S.attempts)){if(S.deleted[a.uid])continue;(ATT[a.id]=ATT[a.id]||[]).push(a)}
-  for(const k in ATT)ATT[k].sort((x,y)=>x.ts-y.ts)}
+  for(const k in ATT)ATT[k].sort((x,y)=>x.ts-y.ts);reindexP()}
+/* 圧迫暗記の記録（通常の練習記録とは別） */
+let PRA={},EZ_CUT=null;
+function reindexP(){PRA={};EZ_CUT=null;for(const a of Object.values(S.pressure||{})){if(S.deleted[a.uid])continue;(PRA[a.id]=PRA[a.id]||[]).push(a)}
+  for(const k in PRA)PRA[k].sort((x,y)=>x.ts-y.ts)}
 reindex();
 let dirty=false;
 function saveState(){sv(K_STATE,S);dirty=true;reindex();scheduleSync()}
@@ -282,7 +292,8 @@ async function ghPut(path,text,sha,msg){const r=await gh(path,{method:'PUT',body
 function lww(a,b){const o={...a};for(const k in b){if(!o[k]||(b[k].u||0)>(o[k].u||0))o[k]=b[k]}return o}
 function merge(L,R){if(!R)return L;
   const deleted={...L.deleted,...R.deleted};const attempts={...R.attempts,...L.attempts};for(const k in deleted)delete attempts[k];
-  return {v:2,attempts,deleted,plan:lww(L.plan,R.plan),overrides:lww(L.overrides,R.overrides),kinki:lww(L.kinki,R.kinki),
+  const pressure={...(R.pressure||{}),...(L.pressure||{})};for(const k in deleted)delete pressure[k];
+  return {v:2,attempts,pressure,deleted,plan:lww(L.plan,R.plan),overrides:lww(L.overrides,R.overrides),kinki:lww(L.kinki,R.kinki),
     settings:Object.assign({},DEF_SET,(R.settings&&(R.settings.u||0)>(L.settings.u||0))?R.settings:L.settings),
     schedule:(R.schedule&&(!L.schedule||(R.schedule.u||0)>(L.schedule.u||0)))?R.schedule:(L.schedule||null)}}
 let syncing=false,syncTimer=null,syncState={t:0,err:''};
@@ -321,15 +332,18 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 /* =========================================================
    画面
    ========================================================= */
-let tab='map',run=null;
-const TABS=[['map','マップ'],['today','今日の暗記'],['plan','スケジュール'],['log','記録'],['kinki','禁忌事項'],['set','設定']];
-function nav(){document.getElementById('nav').innerHTML=TABS.map(([k,v])=>`<button class="${tab===k&&!run?'on':''}" onclick="go('${k}')">${v}</button>`).join('')}
-function go(k){if(run&&run.res.length<blocksOf(run.id).length&&(run.res.length||run.graded)&&!confirm('練習を中断しますか？（この理論の途中経過は記録されません）'))return;run=null;TM.on=false;TM.ms=0;tab=k;draw()}
+let tab='map',run=null,pr=null;
+const TABS=[['map','マップ'],['today','今日の暗記'],['press','圧迫暗記'],['plan','スケジュール'],['log','記録'],['kinki','禁忌事項'],['set','設定']];
+function nav(){document.getElementById('nav').innerHTML=TABS.map(([k,v])=>`<button class="${tab===k&&!run&&!pr?'on':''}" onclick="go('${k}')">${v}</button>`).join('')}
+function go(k){if(run&&run.res.length<blocksOf(run.id).length&&(run.res.length||run.graded)&&!confirm('練習を中断しますか？（この理論の途中経過は記録されません）'))return;
+  if(pr&&pr.ph!=='ready'&&pr.ph!=='done'&&!confirm('圧迫暗記を中断しますか？（この理論の途中経過は記録されません）'))return;
+  run=null;TM.on=false;TM.ms=0;pr=null;PT.on=false;tab=k;draw()}
 function draw(keepScroll){nav();drawSync();const m=document.getElementById('main');
   if(!DATA&&tab!=='set'){m.innerHTML=vNoData();return}
   const y=window.scrollY;
-  m.innerHTML=run?vRun():tab==='map'?vMap():tab==='today'?vToday():tab==='plan'?vPlan():tab==='log'?vLog():tab==='kinki'?vKinki():vSet();
-  if(run){const t=document.getElementById('ans');if(t)t.focus({preventScroll:true});timerSync()}
+  m.innerHTML=pr?vPress():run?vRun():tab==='map'?vMap():tab==='today'?vToday():tab==='press'?vPList():tab==='plan'?vPlan():tab==='log'?vLog():tab==='kinki'?vKinki():vSet();
+  if(pr){if(pr.ph==='test'){const t=document.getElementById('pans');if(t)t.focus({preventScroll:true})}else if(pr.ph!=='study')focusNext();ptick()}
+  else if(run){const t=document.getElementById('ans');if(t)t.focus({preventScroll:true});timerSync()}
   if(keepScroll)window.scrollTo(0,y);else window.scrollTo(0,0)}
 function vNoData(){return `<div class="card"><h2>はじめに：理論データの読み込み</h2>
  <p>理論テキストから作成した <b>理論データ.json</b> を読み込んでください。</p>
@@ -345,7 +359,7 @@ function legend(){const f=[0,3,7,14,30];
   return `<div class="legend"><span><i style="background:#fff"></i>未実施</span>
   <span><i style="background:rgb(var(--r))"></i>${S.settings.threshold}%未満・禁忌違反</span><span><i style="background:rgb(var(--g))"></i>${S.settings.threshold}%以上</span>
   <span><span class="fade">${f.map(d=>`<i style="background:rgba(var(--g),${alphaOf(d)})"></i>`).join('')}</span>濃い＝最近 → 薄い＝実施から日が経過</span>
-  <span><span class="dot" style="position:static;display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--warn);margin-right:4px"></span>今日の予定</span><span><span class="slow">遅</span> 正確だが時間がかかった（目標 ${S.settings.targetSpeed}字/分の75%未満）</span></div>`}
+  <span><span class="dot" style="position:static;display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--warn);margin-right:4px"></span>今日の予定</span><span><span class="slow">遅</span> 正確だが時間がかかった（目標 ${S.settings.targetSpeed}字/分の75%未満）</span><span><span class="ez ez-h">難</span> 圧迫暗記で覚えにくかった</span></div>`}
 function vMap(){
   const p=new Set(planOf());let h=`<div class="card"><div class="row"><div class="seg"><button class="${C.view==='q'?'on':''}" onclick="C.view='q';saveConf();draw(1)">問題ごと（1-1, 1-2…）</button><button class="${C.view==='s'?'on':''}" onclick="C.view='s';saveConf();draw(1)">セクションごと（〔1〕〔2〕…）</button></div>
    <span class="grow"></span><span class="sub">今日の予定 ${p.size}件</span><button class="b s p" onclick="go('today')">今日の暗記へ</button></div>
@@ -358,7 +372,7 @@ function vMap(){
       h+=`<div class="tile ${t.dark?'dark':''}" style="${t.style}" onclick="openQ('${q.q}')">${inPlan?'<span class="dot"></span>':''}
         <div class="no">${q.q} ${stars(mx)}</div><div class="tt">${esc(q.qt)}</div>
         <div class="segs">${q.items.map(i=>{const s=toneStyle(itemStatus(i.id));return `<span style="${s.style}"></span>`}).join('')}</div>
-        <div class="meta">${st?`${pct(st.acc)}・${st.done}/${st.total}・${st.days?st.days+'日前':'今日'}`:'未実施'}${q.items.some(i=>isSlow(i.id))?' <span class="slow">遅</span>':''}</div></div>`}
+        <div class="meta">${st?`${pct(st.acc)}・${st.done}/${st.total}・${st.days?st.days+'日前':'今日'}`:'未実施'}${q.items.some(i=>isSlow(i.id))?' <span class="slow">遅</span>':''}${q.items.some(i=>easeClass(i.id)==='h')?' '+ezTag('h'):''}</div></div>`}
     h+=`</div></div>`;
   }else{
     h+=`<div class="card">`;
@@ -367,7 +381,7 @@ function vMap(){
       for(const i of q.items){const st=itemStatus(i.id),t=toneStyle(st);
         h+=`<div class="tile ${t.dark?'dark':''}" style="${t.style};min-height:78px" onclick="openQ('${q.q}','${i.id}')">${p.has(i.id)?'<span class="dot"></span>':''}
          <div class="no" style="font-size:13px">〔${i.no}〕 ${stars(i.stars)}</div><div class="tt">${esc(i.title)}</div>
-         <div class="meta">${st?`${pct(st.acc)}・${st.days?st.days+'日前':'今日'}`:'未実施'}${isSlow(i.id)?' <span class="slow">遅</span>':''}</div></div>`}}
+         <div class="meta">${st?`${pct(st.acc)}・${st.days?st.days+'日前':'今日'}`:'未実施'}${isSlow(i.id)?' <span class="slow">遅</span>':''}${easeClass(i.id)==='h'?' '+ezTag('h'):''}</div></div>`}}
     h+=`</div></div>`;
   }
   return h;
@@ -375,17 +389,18 @@ function vMap(){
 function openQ(qid,focus){const q=QS.find(x=>x.q===qid),p=new Set(planOf());
   let h=`<div class="row"><h2 class="grow" style="margin:0">問題 ${q.q}　${esc(q.qt)}</h2><button class="b s" onclick="closeSheet()">閉じる</button></div>
   <div class="row" style="margin:10px 0"><button class="b p" onclick="closeSheet();startQueue(${esc(JSON.stringify(q.items.map(i=>i.id)))})">この問題を通しで練習</button>
+  <button class="b" onclick="closeSheet();pQueue(${esc(JSON.stringify(q.items.map(i=>i.id)))})">この問題を圧迫暗記</button>
   <button class="b" onclick="addPlan(${esc(JSON.stringify(q.items.map(i=>i.id)))});openQ('${qid}')">全セクションを今日に追加</button></div>
   <table><tr><th></th><th>セクション</th><th class="n">最新</th><th class="n hide-sm">実施日</th><th class="n hide-sm">次回</th><th></th></tr>`;
   for(const i of q.items){const st=itemStatus(i.id),t=toneStyle(st),s=srsOf(i.id),n=attemptsOf(i.id).length;
     h+=`<tr style="${focus===i.id?'background:var(--brands)':''}"><td><span class="sw" style="${t.style}"></span></td>
-    <td>〔${i.no}〕 ${esc(i.title)} ${stars(i.stars)}${kinkiFor(i.id).some(k=>k.scope!=='g')?' <span class="pill ng">禁忌あり</span>':''}<div class="sub">${n?`${n}回練習`:'未実施'}</div></td>
+    <td>〔${i.no}〕 ${esc(i.title)} ${stars(i.stars)}${kinkiFor(i.id).some(k=>k.scope!=='g')?' <span class="pill ng">禁忌あり</span>':''}<div class="sub">${n?`${n}回練習`:'未実施'}${pAtt(i.id).length?`・圧迫${pAtt(i.id).length}回 ${Math.round(easeOf(i.id))}字/分 ${ezTag(easeClass(i.id))}`:''}</div></td>
     <td class="n">${st?`<span class="${st.pass?'ok':'ng'}">${pct(st.acc)}</span>`:'–'}</td><td class="n hide-sm sub">${st?st.date.slice(5):''}</td><td class="n hide-sm sub">${s?s.due.slice(5):''}</td>
-    <td class="n"><button class="b s p" onclick="closeSheet();startQueue(['${i.id}'])">練習</button>
+    <td class="n"><button class="b s p" onclick="closeSheet();startQueue(['${i.id}'])">練習</button><button class="b s" onclick="closeSheet();pQueue(['${i.id}'])">圧迫</button>
     <button class="b s" onclick="togglePlan('${i.id}');openQ('${qid}','${focus||''}')">${p.has(i.id)?'予定から外す':'今日に追加'}</button></td></tr>`}
   h+=`</table>`;
   document.getElementById('sheetIn').innerHTML=h;document.getElementById('sheet').classList.add('on')}
-function closeSheet(){document.getElementById('sheet').classList.remove('on');if(!run)draw(1)}
+function closeSheet(){document.getElementById('sheet').classList.remove('on');if(!run&&!pr)draw(1)}
 function togglePlan(id){const p=planOf();setPlan(p.includes(id)?p.filter(x=>x!==id):[...p,id])}
 function addPlan(ids){setPlan([...planOf(),...ids])}
 
@@ -434,7 +449,7 @@ function paintTimer(){const el=document.getElementById('tmr');if(!el||!run)retur
 document.addEventListener('visibilitychange',()=>{tick()});
 
 /* ---------- 練習 ---------- */
-function startQueue(ids){if(!ids.length)return;TM.ms=0;TM.on=false;run={queue:ids,qi:0,id:ids[0],i:0,res:[],graded:null,hint:0,peek:false,draft:'',edit:false};draw()}
+function startQueue(ids){if(!ids.length)return;pr=null;PT.on=false;TM.ms=0;TM.on=false;run={queue:ids,qi:0,id:ids[0],i:0,res:[],graded:null,hint:0,peek:false,draft:'',edit:false};draw()}
 function vRun(){
   const it=BYID[run.id],B=blocksOf(run.id);if(run.i>=B.length)return vDone();
   const b=B[run.i],g=run.graded,qtxt=run.queue.length>1?`<span class="pill">${run.qi+1} / ${run.queue.length} 理論目</span>`:'';
@@ -470,6 +485,7 @@ function vRun(){
   return h+`</div>`;
 }
 function vAI(g){
+  if(g.aiState==='poff')return `<div class="ai sub">AI判定：圧迫暗記ではオフ（圧迫暗記の一覧画面の「AI判定も使う」でオンにできます）</div>`;
   if(g.aiState==='off')return `<div class="ai sub">AI判定：${C.apiKey?'オフ（設定でオンにできます）':'未設定（設定画面でAPIキーを入力すると、意味・てにをは・禁忌事項も判定します）'}</div>`;
   if(g.aiState==='pending')return `<div class="ai"><span class="spin"></span> AIが意味と禁忌事項を確認しています…</div>`;
   if(g.aiState==='skip')return `<div class="ai sub">AI判定をスキップしました</div>`;
@@ -488,15 +504,17 @@ function grade(){const b=blocksOf(run.id)[run.i],input=run.draft||'';tick();TM.o
   const d=diff(norm(b.t),norm(input));run.graded={...d,input,sec:TM.ms/1000,helped:run.hint>0||run.peek,ai:null,aiState:aiReady()?'pending':'off',manual:null};
   draw();if(run.graded.aiState==='pending')runAI();else focusNext()}
 function focusNext(){setTimeout(()=>{const n=document.getElementById('nx');n&&n.focus({preventScroll:true})},0)}
-function runAI(){const g=run.graded,it=BYID[run.id],b=blocksOf(run.id)[run.i];g.aiState='pending';draw(1);
-  callAI(it,b,g.input).then(a=>{if(run&&run.graded===g){g.ai=a;g.aiState='done';draw(1);focusNext()}})
-   .catch(e=>{if(run&&run.graded===g){g.aiState='error';g.aiErr=e.message;draw(1)}})}
-function g_skipAI(){run.graded.aiState='skip';draw(1);focusNext()}
-function g_flip(){const g=run.graded;g.manual=!passOf(g);draw(1)}
+/* 採点中の区切り（通常の練習／圧迫暗記のどちらか） */
+const curG=()=>pr?pr.g:(run&&run.graded);
+function runAI(){const R=pr||run,g=curG(),it=BYID[R.id],b=blocksOf(R.id)[R.i];g.aiState='pending';draw(1);
+  callAI(it,b,g.input).then(a=>{if(curG()===g){g.ai=a;g.aiState='done';draw(1);focusNext()}})
+   .catch(e=>{if(curG()===g){g.aiState='error';g.aiErr=e.message;draw(1)}})}
+function g_skipAI(){curG().aiState='skip';draw(1);focusNext()}
+function g_flip(){const g=curG();g.manual=!passOf(g);draw(1)}
 function retry(){run.draft=run.graded.input;run.graded=null;draw()}
-function regKinki(k,scope){const e=run.graded.ai.critical_errors[k];
+function regKinki(k,scope){const R=pr||run,e=curG().ai.critical_errors[k];
   const txt=prompt('禁忌事項として登録する内容（編集できます）',`「${e.correct}」を「${e.written}」と書かない（${e.reason}）`);if(!txt)return;
-  S.kinki[uid()]={scope:scope==='g'?'g':run.id,text:txt.trim(),u:now()};saveState();toast('禁忌事項に登録しました')}
+  S.kinki[uid()]={scope:scope==='g'?'g':R.id,text:txt.trim(),u:now()};saveState();toast('禁忌事項に登録しました')}
 function next(){const g=run.graded;if(!g||g.aiState==='pending')return;
   run.res.push({acc:Math.round(g.acc*10)/10,pass:passOf(g),n:g.n,m:g.match,sec:Math.round(g.sec),helped:g.helped,
     ai:g.ai?{ok:g.ai.meaning_ok,score:g.ai.meaning_score,crit:g.ai.critical_errors.length,kinki:g.ai.kinki_violations.map(k=>k.rule)}:null});
@@ -521,9 +539,143 @@ function nextInQueue(){const q=run.queue,qi=run.qi+1;TM.ms=0;TM.on=false;run={qu
 function saveEdit(){const B=structuredClone(blocksOf(run.id));B[run.i]={h:document.getElementById('eh').value.trim()||null,t:document.getElementById('et').value};
   S.overrides[run.id]={blocks:B,u:now()};saveState();run.edit=false;draw()}
 function resetEdit(){if(!confirm('この理論の編集を取り消しますか？'))return;S.overrides[run.id]={blocks:null,u:now()};saveState();run.edit=false;draw()}
-document.addEventListener('keydown',e=>{if(!run||e.key!=='Enter'||e.ctrlKey||e.metaKey||e.isComposing)return;const a=document.activeElement;
+document.addEventListener('keydown',e=>{if((!run&&!pr)||e.key!=='Enter'||e.ctrlKey||e.metaKey||e.isComposing)return;const a=document.activeElement;
   if(a&&(a.tagName==='TEXTAREA'||a.tagName==='INPUT'||a.id==='nx'))return;
+  if(pr){if(pr.ph==='ready'){e.preventDefault();pBegin()}else if(pr.ph==='graded'&&pr.g.aiState!=='pending'){e.preventDefault();pNext()}
+    else if(pr.ph==='done'&&pr.qi+1<pr.queue.length){e.preventDefault();pNextQ()}return}
   if(run.graded&&run.graded.aiState!=='pending'){e.preventDefault();next()}else if(run.summary&&run.i>=blocksOf(run.id).length&&run.qi+1<run.queue.length){e.preventDefault();nextInQueue()}});
+
+/* =========================================================
+   圧迫暗記
+   区切りごとに「字数 × 秒/字」の時間だけ正解テキストを表示 → 隠して即テスト。
+   合格するたびに、その理論の秒/字を一段短くする（不合格なら同じ段階のまま）。
+   覚えやすさ = 正しく書けた字数の合計 ÷ 覚えるのに使った時間の合計（字/分）。
+   記録は S.pressure に通常の練習とは別に保存（マップの色・復習間隔には影響しない）
+   ========================================================= */
+const PLV=[2.0,1.5,1.2,1.0,0.8,0.6],P_MIN=15;
+function pAtt(id){return PRA[id]||[]}
+function pLevel(id){let lv=0;for(const a of pAtt(id))if(a.pass)lv=Math.min(lv+1,PLV.length-1);return lv}
+function pAllot(b,spc){return Math.max(P_MIN,Math.ceil(norm(b.t).length*spc))}
+function easeRaw(list){let m=0,s=0;for(const x of list){m+=x.m||0;s+=Math.max(3,x.study||0)}return s>0?m/(s/60):null}
+function easeOf(id){return easeRaw(pAtt(id).flatMap(a=>a.blocks||[]))}
+/* 易・普・難：計測済みの理論の中で下位1/3＝難、上位1/3＝易（6件未満のうちは 30字/分未満＝難、50字/分以上＝易） */
+function easeCuts(){const v=ITEMS.map(i=>easeOf(i.id)).filter(x=>x!=null).sort((a,b)=>a-b);
+  if(v.length<6)return [30,50];return [v[Math.floor(v.length/3)],v[Math.floor(v.length*2/3)]]}
+function easeClass(id){const v=easeOf(id);if(v==null)return null;if(!EZ_CUT)EZ_CUT=easeCuts();return v<EZ_CUT[0]?'h':v>=EZ_CUT[1]?'e':'m'}
+const EZL={e:['易','ez-e'],m:['普','ez-m'],h:['難','ez-h']};
+const ezTag=c=>c?`<span class="ez ${EZL[c][1]}">${EZL[c][0]}</span>`:'';
+
+/* 時間：アプリが前面にある時間だけ数える */
+const PT={ms:0,last:0,on:false,iv:null};
+function ptAdd(){const t=performance.now();if(PT.on&&document.visibilityState==='visible')PT.ms+=t-PT.last;PT.last=t}
+function pTimer(on){PT.ms=0;PT.last=performance.now();PT.on=on;if(!PT.iv)PT.iv=setInterval(ptick,250)}
+function ptick(){ptAdd();if(!pr)return;
+  if(pr.ph==='study'){const left=pr.allot-PT.ms/1000,el=document.getElementById('pcd'),bar=document.getElementById('pbar');
+    if(el){el.textContent=fmtSec(Math.max(0,Math.ceil(left)));el.className='cd'+(left<=10?' low':'')}
+    if(bar)bar.style.width=Math.max(0,100*left/pr.allot)+'%';
+    if(left<=0)endStudy(true)}
+  else if(pr.ph==='test'){const el=document.getElementById('ptm');if(el)el.textContent='テスト経過 '+fmtSec(PT.ms/1000)}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')PT.last=performance.now();else ptAdd()});
+
+function pNew(id){return {id,lv:pLevel(id),ph:'ready',i:0,res:[],draft:'',g:null}}
+function pQueue(ids){ids=(ids||[]).filter(id=>BYID[id]);if(!ids.length)return;run=null;TM.on=false;pr={queue:ids,qi:0,...pNew(ids[0])};draw()}
+function pNextQ(){const q=pr.queue,qi=pr.qi+1;pr={queue:q,qi,...pNew(q[qi])};draw()}
+function pBegin(){if(!pr)return;pr.ph='study';pr.allot=pAllot(blocksOf(pr.id)[pr.i],PLV[pr.lv]);pr.draft='';pTimer(true);draw()}
+function endStudy(auto){if(!pr||pr.ph!=='study')return;ptAdd();
+  pr.study=Math.min(pr.allot,Math.round(PT.ms/100)/10);pr.ph='test';pTimer(true);draw();if(auto)toast('時間です。すぐに書いてください')}
+function pGrade(){if(!pr||pr.ph!=='test')return;ptAdd();PT.on=false;
+  const b=blocksOf(pr.id)[pr.i],input=pr.draft||'',d=diff(norm(b.t),norm(input));
+  const st=!C.pressAI?'poff':aiReady()?'pending':'off';
+  pr.g={...d,input,sec:PT.ms/1000,helped:false,ai:null,aiState:st,manual:null};pr.ph='graded';draw();if(st==='pending')runAI()}
+function pNext(){const g=pr&&pr.g;if(!g||g.aiState==='pending')return;const b=blocksOf(pr.id)[pr.i];
+  pr.res.push({h:b.h||'',n:g.n,m:g.match,acc:Math.round(g.acc*10)/10,pass:passOf(g),allot:pr.allot,study:pr.study,test:Math.round(g.sec),
+    ai:g.ai?{ok:g.ai.meaning_ok,score:g.ai.meaning_score,kinki:g.ai.kinki_violations.map(k=>k.rule)}:null});
+  pr.i++;pr.g=null;pr.draft='';
+  if(pr.i<blocksOf(pr.id).length){pBegin();return}
+  pRecord();pr.ph='done';draw()}
+function pRecord(){const R=pr.res,tot=R.reduce((s,r)=>s+r.n,0)||1,u=uid();
+  const a={uid:u,ts:now(),date:TODAY(),id:pr.id,dev:C.device||'',lv:pr.lv,spc:PLV[pr.lv],acc:Math.round(R.reduce((s,r)=>s+r.acc*r.n,0)/tot*10)/10,
+    pass:R.every(r=>r.pass),study:Math.round(R.reduce((s,r)=>s+r.study,0)),test:R.reduce((s,r)=>s+r.test,0),blocks:R};
+  S.pressure[u]=a;saveState();pr.rec=a}
+
+function vPress(){const it=BYID[pr.id],B=blocksOf(pr.id),spc=PLV[pr.lv];
+  const qtxt=pr.queue.length>1?`<span class="pill">${pr.qi+1} / ${pr.queue.length} 理論目</span>`:'';
+  let h=`<div class="card"><div class="row"><div class="grow"><span class="kind k-speed">圧迫暗記</span>${itemLabel(it)}</div>${qtxt}${stars(it.stars)}<button class="b s" onclick="go('press')">${pr.ph==='done'?'閉じる':'中断'}</button></div>`;
+  if(pr.ph==='done')return h+vPDone()+'</div>';
+  h+=`<div class="prog">${B.map((_,k)=>`<span class="${k<pr.res.length?(pr.res[k].pass?'ok':'ng'):k===pr.i?'cur':''}"></span>`).join('')}</div>`;
+  if(pr.ph==='ready'){const tot=B.reduce((s,b)=>s+pAllot(b,spc),0),A=pAtt(pr.id);
+    return h+`<p>区切りごとに、正解テキストが <b>${spc.toFixed(1)}秒/字</b> の時間だけ表示されます。時間が来ると隠れるので、すぐに思い出して書いてください。早く覚えられたら「覚えた」で先に進めます。</p>
+     <div class="stats"><div class="stat"><span class="sub">区切り</span><b>${B.length}</b></div><div class="stat"><span class="sub">字数</span><b>${charsOf(pr.id)}</b></div>
+     <div class="stat"><span class="sub">覚える時間（合計）</span><b>${fmtSec(tot)}</b></div><div class="stat"><span class="sub">これまでの圧迫暗記</span><b>${A.length}<span class="sub"> 回${A.length?'（合格'+A.filter(a=>a.pass).length+'）':''}</span></b></div></div>
+     <div class="field"><label>段階（合格するたびに自動で一段短くなります。ここで変えることもできます）</label><div class="seg">${PLV.map((v,k)=>`<button class="${k===pr.lv?'on':''}" onclick="pr.lv=${k};draw(1)">${v.toFixed(1)}秒/字</button>`).join('')}</div></div>
+     <div class="row"><button class="b p" id="nx" onclick="pBegin()">開始 <kbd>Enter</kbd></button></div></div>`}
+  const b=B[pr.i],head=b.h?(S.settings.showHead?esc(b.h):esc(b.h[0])+' <span class="sub">（見出し非表示）</span>'):'（本文）';
+  h+=`<div class="sub">区切り ${pr.i+1} / ${B.length}・${spc.toFixed(1)}秒/字</div><div class="prompt">${head}</div>`;
+  if(pr.ph==='study')
+    return h+`<div class="row" style="align-items:center"><span id="pcd" class="cd">${fmtSec(pr.allot)}</span><span class="sub">${norm(b.t).length}字を ${fmtSec(pr.allot)} で覚える</span><span class="grow"></span><button class="b p" onclick="endStudy(false)">覚えた → テストへ</button></div>
+     <div class="bar cdb" style="margin:8px 0 10px"><i id="pbar" style="width:100%"></i></div><div class="studytext">${esc(b.t)}</div></div>`;
+  if(pr.ph==='test')
+    return h+`<div class="row" style="margin-bottom:6px"><span id="ptm" class="timer">テスト経過 0:00</span><span class="sub">覚えた時間 ${fmtSec(pr.study)}</span></div>
+     <textarea id="pans" placeholder="今覚えた内容を入力" oninput="pr.draft=this.value" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();pGrade()}">${esc(pr.draft)}</textarea>
+     <div class="row" style="margin-top:10px"><button class="b p" onclick="pGrade()">採点 <kbd>Ctrl/⌘+Enter</kbd></button></div></div>`;
+  const g=pr.g,pass=passOf(g);
+  return h+`<div class="row" style="margin:6px 0 8px"><span class="big ${pass?'ok':'ng'}">${pass?'○':'×'} ${pct(g.acc)}</span>
+   <span class="sub">覚えた時間 ${fmtSec(pr.study)}／${fmtSec(pr.allot)}・テスト ${fmtSec(g.sec)}<br>脱落 ${g.miss}字・余分 ${g.extra}字／正解 ${g.n}字</span><span class="grow"></span>
+   <button class="b s" onclick="g_flip()">${pass?'×にする':'○にする'}</button></div>
+   <div class="sub" style="margin-bottom:6px"><span style="background:var(--miss);padding:0 4px">赤＝書けなかった</span>　<span style="background:var(--extra);text-decoration:line-through;padding:0 4px">灰＝余分</span></div>
+   <div class="diff">${renderDiff(g.ops)}</div>${vAI(g)}
+   <div class="row" style="margin-top:12px"><button class="b p" id="nx" onclick="pNext()" ${g.aiState==='pending'?'disabled':''}>${pr.i+1<B.length?'次の区切りへ（すぐ表示が始まります）':'結果を記録'} <kbd>Enter</kbd></button>
+   ${g.aiState==='pending'?`<button class="b" onclick="g_skipAI()">AI判定を待たずに進む</button>`:''}</div></div>`}
+function vPDone(){const a=pr.rec,more=pr.qi+1<pr.queue.length,nl=pLevel(pr.id),ez=easeOf(pr.id);
+  return `<div class="row" style="margin:14px 0"><span class="big ${a.pass?'ok':'ng'}">${a.pass?'○ 合格':'× 不合格'}</span><span class="big">${pct(a.acc)}</span>
+   <span class="sub">${a.spc.toFixed(1)}秒/字・覚えた時間 ${fmtSec(a.study)}・テスト ${fmtSec(a.test)}</span></div>
+  <p style="margin:0 0 8px">${a.pass?(a.lv<PLV.length-1?`合格です。次回は <b>${PLV[nl].toFixed(1)}秒/字</b> に短くなります。`:'最短の段階で合格しました。'):`次回も <b>${PLV[nl].toFixed(1)}秒/字</b> で挑戦します。`}</p>
+  <table><tr><th>区切り</th><th class="n">精度</th><th class="n">覚えた時間</th><th class="n hide-sm">覚えやすさ</th><th></th></tr>${a.blocks.map((r,k)=>`<tr><td>区切り${k+1} ${esc(r.h)}</td><td class="n">${pct(r.acc)}</td><td class="n sub">${fmtSec(r.study)}／${fmtSec(r.allot)}</td>
+   <td class="n sub hide-sm">${r.study?Math.round(r.m/(r.study/60))+'字/分':''}</td><td>${r.pass?'<span class="ok">○</span>':'<span class="ng">×</span>'}${r.ai&&!r.ai.ok?' <span class="pill ng">意味NG</span>':''}${r.ai&&r.ai.kinki.length?' <span class="pill ng">禁忌違反</span>':''}</td></tr>`).join('')}</table>
+  <p class="sub">この理論の覚えやすさ：${ez!=null?Math.round(ez)+'字/分 '+ezTag(easeClass(pr.id)):'–'}（これまでの圧迫暗記で、覚えるのに使った1分あたりに正しく書けた字数）</p>
+  <div class="row">${more?`<button class="b p" id="nx" onclick="pNextQ()">次の理論へ（${pr.queue[pr.qi+1]}） <kbd>Enter</kbd></button>`:''}
+  <button class="b" onclick="pQueue(['${pr.id}'])">もう一度</button><button class="b" onclick="startQueue(['${pr.id}'])">通常の練習で記録する</button><button class="b" onclick="go('press')">圧迫暗記の一覧へ</button></div>`}
+
+function vPList(){const all=Object.values(PRA).flat().sort((a,b)=>b.ts-a.ts),done=ITEMS.filter(i=>pAtt(i.id).length);
+  const p=planOf().filter(id=>BYID[id]),nextNew=[...ITEMS.filter(i=>i.stars>=2),...ITEMS.filter(i=>i.stars<2)].find(i=>!pAtt(i.id).length);
+  const ezAll=easeRaw(all.flatMap(a=>a.blocks||[]));
+  let h=`<div class="card"><h2>圧迫暗記</h2><p class="sub" style="margin-top:0">区切りごとに、字数に応じた短い時間だけ正解テキストを表示し、隠したらすぐに書いてテストします。覚える時間は ${PLV.map(v=>v.toFixed(1)).join(' → ')} 秒/字 と、その理論で合格するたびに一段ずつ短くなります。
+   短い時間で覚えられた理論・区切りほど「覚えやすい」、時間をかけても書けない所ほど「覚えにくい」ものとしてデータが貯まります。</p>
+   <p class="sub">この記録は通常の練習とは別に保存し、マップの色や復習間隔には影響しません（覚えにくい理論には、マップに <span class="ez ez-h">難</span> が付きます）。AIスケジュールにも覚えやすさを渡します。</p>
+   <div class="row"><button class="b p" onclick="pQueue(${esc(JSON.stringify(p))})" ${p.length?'':'disabled'}>今日の予定を圧迫暗記（${p.length}件）</button>
+   ${nextNew?`<button class="b" onclick="pQueue(['${nextNew.id}'])">まだやっていない次の理論（${nextNew.q}〔${nextNew.no}〕）</button>`:''}<button class="b" onclick="go('map')">マップから選ぶ</button>
+   <span class="grow"></span><label class="sub"><input type="checkbox" ${C.pressAI?'checked':''} onchange="C.pressAI=this.checked;saveConf()"> AI判定も使う（APIの利用料がかかります）</label></div></div>
+   <div class="card"><div class="stats"><div class="stat"><span class="sub">実施した理論</span><b>${done.length}<span class="sub"> / ${ITEMS.length}</span></b></div>
+   <div class="stat"><span class="sub">圧迫暗記の回数</span><b>${all.length}</b></div><div class="stat"><span class="sub">合格率</span><b>${all.length?pct(100*all.filter(a=>a.pass).length/all.length):'–'}</b></div>
+   <div class="stat"><span class="sub">全体の覚えやすさ</span><b>${ezAll!=null?Math.round(ezAll):'–'}<span class="sub"> 字/分</span></b></div>
+   <div class="stat"><span class="sub">覚えにくい（難）</span><b>${done.filter(i=>easeClass(i.id)==='h').length}</b></div></div></div>`;
+  if(!done.length)return h+`<div class="card empty">まだ記録がありません。上のボタンか、マップの理論を開いて「圧迫」から始めてください。</div>`;
+  const srt={hard:(a,b)=>easeOf(a.id)-easeOf(b.id),easy:(a,b)=>easeOf(b.id)-easeOf(a.id),order:()=>0}[C.pSort]||(()=>0);
+  h+=`<div class="card"><div class="row"><h2 class="grow" style="margin:0">理論ごとの覚えやすさ</h2><div class="seg">${[['hard','覚えにくい順'],['easy','覚えやすい順'],['order','教科書順']].map(([k,l])=>`<button class="${C.pSort===k?'on':''}" onclick="C.pSort='${k}';saveConf();draw(1)">${l}</button>`).join('')}</div></div>
+   <p class="sub">覚えやすさ＝覚えるのに使った1分あたりに正しく書けた字数（全回の合計）。易・普・難は、実施した理論の中での上位・中位・下位1/3です。</p>
+   <table><tr><th>理論</th><th class="n">覚えやすさ</th><th class="n hide-sm">次の段階</th><th class="n hide-sm">回数</th><th class="n">最新</th><th></th></tr>`;
+  done.slice().sort(srt).forEach(i=>{const A=pAtt(i.id),l=A[A.length-1];
+    h+=`<tr><td>${itemLabel(i)}</td><td class="n">${Math.round(easeOf(i.id))}字/分 ${ezTag(easeClass(i.id))}</td><td class="n hide-sm sub">${PLV[pLevel(i.id)].toFixed(1)}秒/字</td>
+    <td class="n hide-sm">${A.length}<span class="sub">（合格${A.filter(a=>a.pass).length}）</span></td><td class="n"><span class="${l.pass?'ok':'ng'}">${pct(l.acc)}</span><div class="sub">${l.date.slice(5)}</div></td>
+    <td class="n"><button class="b s p" onclick="pQueue(['${i.id}'])">圧迫</button></td></tr>`});
+  h+=`</table></div>`;
+  // 区切り単位
+  const bl=[];done.forEach(i=>{const A=pAtt(i.id),nb=Math.max(...A.map(a=>(a.blocks||[]).length));
+    for(let k=0;k<nb;k++){const L=A.map(a=>a.blocks[k]).filter(Boolean),v=easeRaw(L);if(v!=null)bl.push({i,k,v,h:L[L.length-1].h,n:L.length,ng:L.filter(x=>!x.pass).length})}});
+  bl.sort((a,b)=>a.v-b.v);
+  h+=`<div class="card"><h2>覚えにくい区切り（ワースト15）</h2><table><tr><th>理論・区切り</th><th class="n">覚えやすさ</th><th class="n">不合格</th><th></th></tr>
+   ${bl.slice(0,15).map(x=>`<tr><td><b>${x.i.q}〔${x.i.no}〕</b> ${esc(x.i.title)}<div class="sub">区切り${x.k+1} ${esc(x.h)}</div></td><td class="n">${Math.round(x.v)}字/分</td><td class="n">${x.ng}/${x.n}</td>
+   <td class="n"><button class="b s" onclick="pQueue(['${x.i.id}'])">圧迫</button></td></tr>`).join('')}</table></div>`;
+  h+=`<div class="card"><div class="row"><h2 class="grow" style="margin:0">圧迫暗記の履歴</h2><button class="b s" onclick="exportPCSV()">CSVで書き出す</button></div>
+   <table><tr><th>日時</th><th>理論</th><th class="n">段階</th><th class="n">覚えた時間</th><th class="n">精度</th><th></th></tr>
+   ${all.slice(0,50).map(a=>{const it=BYID[a.id],t=new Date(a.ts);return `<tr><td class="sub">${a.date.slice(5)} ${pad(t.getHours())}:${pad(t.getMinutes())}</td><td>${it?`${it.q}〔${it.no}〕 ${esc(it.title)}`:esc(a.id)}</td>
+   <td class="n sub">${a.spc.toFixed(1)}秒/字</td><td class="n">${fmtSec(a.study)}</td><td class="n"><span class="${a.pass?'ok':'ng'}">${a.pass?'○':'×'} ${pct(a.acc)}</span></td>
+   <td class="n"><button class="b s" onclick="delP('${a.uid}')">削除</button></td></tr>`}).join('')}</table></div>`;
+  return h}
+function delP(u){if(!confirm('この圧迫暗記の記録を削除しますか？'))return;S.deleted[u]=1;delete S.pressure[u];saveState();draw(1)}
+function exportPCSV(){const rows=[['日付','時刻','端末','問題','区分','理論','重要度','区切り','見出し','秒/字','表示時間(秒)','覚えた時間(秒)','テスト時間(秒)','字数','正しく書けた字数','精度','判定','覚えやすさ(字/分)']];
+  Object.values(PRA).flat().sort((a,b)=>a.ts-b.ts).forEach(a=>{const it=BYID[a.id]||{},t=new Date(a.ts);(a.blocks||[]).forEach((b,k)=>rows.push([a.date,pad(t.getHours())+':'+pad(t.getMinutes()),a.dev,it.q,it.no,it.title,it.stars,k+1,b.h,a.spc,b.allot,b.study,b.test,b.n,b.m,b.acc,b.pass?'○':'×',b.study?Math.round(b.m/(b.study/60)):'']))});
+  dl(`圧迫暗記_${TODAY()}.csv`,'﻿'+rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\r\n'),'text/csv')}
 
 /* =========================================================
    スケジュール（AI／自動）
@@ -567,13 +719,14 @@ const PLAN_SYS=`あなたは税理士試験「消費税法」の理論暗記を�
 5. 試験日が与えられている場合、試験日までに全理論を一巡し、その後に反復できるよう逆算する。間に合わない場合は★★を優先し、その旨を strategy に書く。
 6. 各日の合計見込み時間（min の合計）は、その日の使える時間を超えない（最大+10%）。使える時間が0分の日は空にする。
 7. min には与えられた見込み時間（新規なら「新規見込み」、それ以外は「練習見込み」）を基本として使う。
+8. 「覚えやすさ」は圧迫暗記（短時間だけ見て即テスト）で測った、覚えるのに使った1分あたりに正しく書けた字数で、空欄は未計測。「難」の理論は覚えにくいので、新規なら早めに着手して min に2〜3割の余裕を持たせ、復習も間隔を詰める。「易」の理論は後回しにしてよい。
 
 出力は次のJSONオブジェクトのみ（前後に文章やコードフェンスを付けない）:
 {"strategy":"全体方針（250字以内）","milestones":["節目となる目標（例：11月末までに★★を一巡）"],"days":[{"date":"YYYY-MM-DD","items":[{"id":"理論ID","kind":"new|review|fix|speed","min":整数}],"note":"その日の狙い（40字以内）"}]}`;
 async function aiPlan(){const st=S.settings,t=TODAY(),o=overview(),sp=mySpeed();
   const dayLines=[];for(let k=0;k<st.horizon;k++){const d=addDays(t,k);dayLines.push(`${d}（${'日月火水木金土'[new Date(d+'T00:00:00').getDay()]}）${budgetOf(d)}分`)}
   const rows=ITEMS.map(i=>{const A=attemptsOf(i.id),l=A[A.length-1],s=srsOf(i.id),v=l?speedOf(l):null;
-    return [i.id,'★'.repeat(i.stars)||'-',(i.qt+'／'+i.title).slice(0,24),charsOf(i.id),A.length,l?Math.round(l.acc):'',l?(l.pass?'合格':'不合格'):'',l?l.date:'',v?Math.round(v):'',l?({slow:'遅',mid:'やや遅',fast:'速',na:'-'}[speedClass(l)]):'',s?s.due:'',Math.round(estPractice(i.id)),Math.round(estNew(i.id))].join('|')});
+    return [i.id,'★'.repeat(i.stars)||'-',(i.qt+'／'+i.title).slice(0,24),charsOf(i.id),A.length,l?Math.round(l.acc):'',l?(l.pass?'合格':'不合格'):'',l?l.date:'',v?Math.round(v):'',l?({slow:'遅',mid:'やや遅',fast:'速',na:'-'}[speedClass(l)]):'',s?s.due:'',Math.round(estPractice(i.id)),Math.round(estNew(i.id)),easeOf(i.id)!=null?Math.round(easeOf(i.id))+({e:'易',m:'普',h:'難'}[easeClass(i.id)]):''].join('|')});
   const user=`今日: ${t}
 試験日: ${st.examDate||'未設定'}${o.left!=null?`（あと${o.left}日）`:''}
 計画期間と各日の使える時間:
@@ -581,7 +734,7 @@ ${dayLines.join('\n')}
 目標速度: ${st.targetSpeed}字/分　この受験生の実測中央値: ${Math.round(sp)}字/分
 現状: 未学習${o.un}件（うち★★${o.un2}件）、不合格${o.red}件、遅い${o.slow}件、定着${o.green}件、期限到来${o.due}件
 
-理論一覧（列: ID|重要度|問題／セクション|字数|練習回数|最新精度|最新判定|最終実施日|最新速度(字/分)|速度判定|次回期限|練習見込み(分)|新規見込み(分)）
+理論一覧（列: ID|重要度|問題／セクション|字数|練習回数|最新精度|最新判定|最終実施日|最新速度(字/分)|速度判定|次回期限|練習見込み(分)|新規見込み(分)|覚えやすさ(字/分・易普難)）
 ${rows.join('\n')}`;
   const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':C.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
     body:JSON.stringify({model:C.model,max_tokens:16000,system:PLAN_SYS,messages:[{role:'user',content:user}]})});
@@ -697,7 +850,7 @@ function vSet(){const st=S.settings;
   <div class="row"><label class="b">理論データ／バックアップを読み込む<input type="file" accept=".json,application/json" style="display:none" onchange="importData(this.files[0])"></label>
   <button class="b" onclick="exportJSON()">記録のバックアップ（JSON）</button><button class="b" onclick="exportCSV()">練習履歴をCSVで書き出す</button></div>
   <p class="sub">旧版（HTMLファイル版）で書き出したバックアップJSONも読み込めます。</p></div>
-  <div class="card sub">消費税法 理論暗記 v2.1.0</div>`}
+  <div class="card sub">消費税法 理論暗記 v2.2.0</div>`}
 function setS(k,v){S.settings[k]=v;S.settings.u=now();saveState()}
 function saveAI(){C.apiKey=document.getElementById('ak').value.trim();C.model=document.getElementById('am').value;C.aiOn=document.getElementById('ao').checked;saveConf();toast('保存しました')}
 async function testAI(){saveAI();const el=document.getElementById('aitest');el.innerHTML='<span class="spin"></span> テスト中…';
