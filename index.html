@@ -146,7 +146,7 @@ function initState(){const t=now(),k={};DEFAULT_KINKI.forEach(x=>{const id=uid()
   return {v:2,attempts:{},pressure:{},deleted:{},plan:{},overrides:{},kinki:k,settings:{threshold:90,ignorePunct:false,ignoreMarks:true,showHead:true,u:0}}}
 let DATA=ld(K_DATA,null);
 let S=ld(K_STATE,null)||initState();
-const DEF_SET={threshold:90,ignorePunct:false,ignoreMarks:true,showHead:true,targetSpeed:40,examDate:'',minWeekday:60,minWeekend:120,horizon:14,learnRate:12};
+const DEF_SET={threshold:90,ignorePunct:false,ignoreMarks:true,showHead:true,memHead:true,targetSpeed:40,examDate:'',minWeekday:60,minWeekend:120,horizon:14,learnRate:12};
 S.settings=Object.assign({},DEF_SET,S.settings);S.schedule=S.schedule||null;S.pressure=S.pressure||{};
 let C=Object.assign({model:'claude-sonnet-5-5',aiOn:true,apiKey:'',ghOwner:'',ghRepo:'',ghToken:'',device:'',view:'q',pressAI:false,pSort:'hard'},ld(K_CONF,{}));
 let ITEMS=[],BYID={},QS=[],ATT={};
@@ -191,7 +191,13 @@ function srsOf(id){const A=attemptsOf(id);if(!A.length)return null;let i=-1;
   return {iv:STEPS[i],due:addDays(A[A.length-1].date,STEPS[i]),q:quality(A[A.length-1])}}
 const fmtSec=s=>{s=Math.round(s||0);return s>=3600?`${Math.floor(s/3600)}時間${Math.round(s%3600/60)}分`:`${Math.floor(s/60)}:${pad(s%60)}`};
 const fmtMin=m=>m>0&&m<1?"1分未満":m>=60?`${Math.floor(m/60)}時間${Math.round(m%60)}分`:`${Math.round(m)}分`;
-function charsOf(id){return blocksOf(id).reduce((s,b)=>s+norm(b.t).length,0)}
+/* 見出し（⑴ 課税の対象）：「見出しも覚える」がオンなら、問いには番号（（1））だけを出し、見出しの文言も解答に含める */
+function headParts(h){if(!h)return null;const m=h.match(/^([⑴-⒇])[\s　]*(.*)$/);return m?{no:m[1],label:m[2].trim()}:{no:'',label:h.trim()}}
+const memHead=()=>S.settings.memHead!==false;
+function tgt(b){const p=headParts(b.h);return memHead()&&p&&p.label?p.label+'\n'+b.t:b.t}
+function headHTML(b){if(!b.h)return '（本文）';if(!memHead())return esc(b.h);const p=headParts(b.h);
+  const no=p.no?'（'+(p.no.charCodeAt(0)-0x2473)+'）':'';return no+(p.label?' <span class="sub">見出しから書く</span>':'')}
+function charsOf(id){return blocksOf(id).reduce((s,b)=>s+norm(tgt(b)).length,0)}
 function mySpeed(){const v=Object.values(ATT).flat().map(speedOf).filter(x=>x);if(v.length<3)return S.settings.targetSpeed;v.sort((a,b)=>a-b);return v[Math.floor(v.length/2)]}
 /* 1回の練習（思い出して書く）にかかる見込み時間（分） */
 function estPractice(id){const A=attemptsOf(id).filter(a=>a.sec).slice(-3);
@@ -262,7 +268,7 @@ async function callAI(item,block,input){
 【禁忌事項】
 ${kk.length?kk.map((k,i)=>`${i+1}. ${k.text}`).join('\n'):'（なし）'}
 【正解テキスト】
-${block.t}
+${tgt(block)}
 【受験生の解答】
 ${input||'（空欄）'}`;
   const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':C.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
@@ -444,7 +450,7 @@ function timerSync(){const inp=run&&!run.graded&&!run.edit&&run.i<blocksOf(run.i
   if(!TM.iv)TM.iv=setInterval(tick,1000);paintTimer()}
 function touch(){TM.lastInput=performance.now()}
 function paintTimer(){const el=document.getElementById('tmr');if(!el||!run)return;const b=blocksOf(run.id)[run.i];if(!b)return;
-  const goal=norm(b.t).length/S.settings.targetSpeed*60,idle=TM.on&&performance.now()-TM.lastInput>IDLE_MS;
+  const goal=norm(tgt(b)).length/S.settings.targetSpeed*60,idle=TM.on&&performance.now()-TM.lastInput>IDLE_MS;
   el.innerHTML=`経過 ${fmtSec(TM.ms/1000)}<span class="sub" style="font-weight:400">　目安 ${fmtSec(goal)}${idle?'　（入力がないため一時停止中）':''}</span>`;el.className='timer'+(TM.ms/1000>goal?' over':'')}
 document.addEventListener('visibilitychange',()=>{tick()});
 
@@ -456,7 +462,7 @@ function vRun(){
   let h=`<div class="card"><div class="row"><div class="grow">${itemLabel(it)}</div>${qtxt}${stars(it.stars)}<button class="b s" onclick="go(tab)">中断</button></div>
    <div class="prog">${B.map((_,k)=>`<span class="${k<run.res.length?(run.res[k].pass?'ok':'ng'):k===run.i?'cur':''}"></span>`).join('')}</div>
    <div class="sub">区切り ${run.i+1} / ${B.length}${aiReady()?'　・AI判定オン':C.apiKey&&C.aiOn?'　・オフラインのためAI判定なし':''}</div>
-   <div class="prompt">${b.h?(S.settings.showHead?esc(b.h):esc(b.h[0])+' <span class="sub">（見出し非表示）</span>'):'（本文）'}</div>`;
+   <div class="prompt">${headHTML(b)}</div>`;
   if(run.edit){
     return h+`<p class="sub">PDF抽出で崩れている箇所を修正できます（同期対象）。</p><input type="text" id="eh" value="${esc(b.h||'')}" placeholder="見出し（空欄可）" style="margin-bottom:6px">
     <textarea id="et" style="min-height:260px">${esc(b.t)}</textarea><div class="row" style="margin-top:8px"><button class="b p" onclick="saveEdit()">保存</button><button class="b" onclick="run.edit=false;draw()">キャンセル</button>
@@ -466,7 +472,7 @@ function vRun(){
     h+=`${kk.length?`<div class="kinki"><b>この理論の禁忌：</b>${kk.map(k=>esc(k.text)).join('／')}</div>`:''}
     <div class="row" style="margin-bottom:6px"><span id="tmr" class="timer"></span></div>
     <textarea id="ans" placeholder="覚えた内容を入力" oninput="run.draft=this.value;touch()" oncompositionupdate="touch()" onkeydown="touch();if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();grade()}">${esc(run.draft)}</textarea>
-    ${run.hint?`<div class="hint">ヒント：${esc(norm(b.t).slice(0,run.hint))}…</div>`:''}${run.peek?`<div class="answer" style="margin-top:8px">${esc(b.t)}</div>`:''}
+    ${run.hint?`<div class="hint">ヒント：${esc(norm(tgt(b)).slice(0,run.hint))}…</div>`:''}${run.peek?`<div class="answer" style="margin-top:8px">${esc(tgt(b))}</div>`:''}
     <div class="row" style="margin-top:10px"><button class="b p" onclick="grade()">採点 <kbd>Ctrl/⌘+Enter</kbd></button><button class="b" onclick="run.hint+=10;draw()">ヒント</button>
     <button class="b" onclick="run.peek=!run.peek;draw()">${run.peek?'正解を隠す':'正解を見る'}</button><span class="grow"></span><button class="b s" onclick="run.edit=true;draw()">正解テキストを編集</button></div>
     ${run.hint||run.peek?`<p class="sub">ヒント／正解表示を使った区切りは不合格として記録されます。</p>`:''}`;
@@ -501,7 +507,7 @@ function vAI(g){
 function passOf(g){if(g.manual!=null)return g.manual;if(g.helped)return false;if(g.acc<S.settings.threshold)return false;
   if(g.ai&&(!g.ai.meaning_ok||g.ai.kinki_violations.length))return false;return true}
 function grade(){const b=blocksOf(run.id)[run.i],input=run.draft||'';tick();TM.on=false;
-  const d=diff(norm(b.t),norm(input));run.graded={...d,input,sec:TM.ms/1000,helped:run.hint>0||run.peek,ai:null,aiState:aiReady()?'pending':'off',manual:null};
+  const d=diff(norm(tgt(b)),norm(input));run.graded={...d,input,sec:TM.ms/1000,helped:run.hint>0||run.peek,ai:null,aiState:aiReady()?'pending':'off',manual:null};
   draw();if(run.graded.aiState==='pending')runAI();else focusNext()}
 function focusNext(){setTimeout(()=>{const n=document.getElementById('nx');n&&n.focus({preventScroll:true})},0)}
 /* 採点中の区切り（通常の練習／圧迫暗記のどちらか） */
@@ -555,7 +561,7 @@ document.addEventListener('keydown',e=>{if((!run&&!pr)||e.key!=='Enter'||e.ctrlK
 const PLV=[2.0,1.5,1.2,1.0,0.8,0.6],P_MIN=15;
 function pAtt(id){return PRA[id]||[]}
 function pLevel(id){let lv=0;for(const a of pAtt(id))if(a.pass)lv=Math.min(lv+1,PLV.length-1);return lv}
-function pAllot(b,spc){return Math.max(P_MIN,Math.ceil(norm(b.t).length*spc))}
+function pAllot(b,spc){return Math.max(P_MIN,Math.ceil(norm(tgt(b)).length*spc))}
 function easeRaw(list){let m=0,s=0;for(const x of list){m+=x.m||0;s+=Math.max(3,x.study||0)}return s>0?m/(s/60):null}
 function easeOf(id){return easeRaw(pAtt(id).flatMap(a=>a.blocks||[]))}
 /* 易・普・難：計測済みの理論の中で下位1/3＝難、上位1/3＝易（6件未満のうちは 30字/分未満＝難、50字/分以上＝易） */
@@ -584,7 +590,7 @@ function pBegin(){if(!pr)return;pr.ph='study';pr.allot=pAllot(blocksOf(pr.id)[pr
 function endStudy(auto){if(!pr||pr.ph!=='study')return;ptAdd();
   pr.study=Math.min(pr.allot,Math.round(PT.ms/100)/10);pr.ph='test';pTimer(true);draw();if(auto)toast('時間です。すぐに書いてください')}
 function pGrade(){if(!pr||pr.ph!=='test')return;ptAdd();PT.on=false;
-  const b=blocksOf(pr.id)[pr.i],input=pr.draft||'',d=diff(norm(b.t),norm(input));
+  const b=blocksOf(pr.id)[pr.i],input=pr.draft||'',d=diff(norm(tgt(b)),norm(input));
   const st=!C.pressAI?'poff':aiReady()?'pending':'off';
   pr.g={...d,input,sec:PT.ms/1000,helped:false,ai:null,aiState:st,manual:null};pr.ph='graded';draw();if(st==='pending')runAI()}
 function pNext(){const g=pr&&pr.g;if(!g||g.aiState==='pending')return;const b=blocksOf(pr.id)[pr.i];
@@ -609,11 +615,11 @@ function vPress(){const it=BYID[pr.id],B=blocksOf(pr.id),spc=PLV[pr.lv];
      <div class="stat"><span class="sub">覚える時間（合計）</span><b>${fmtSec(tot)}</b></div><div class="stat"><span class="sub">これまでの圧迫暗記</span><b>${A.length}<span class="sub"> 回${A.length?'（合格'+A.filter(a=>a.pass).length+'）':''}</span></b></div></div>
      <div class="field"><label>段階（合格するたびに自動で一段短くなります。ここで変えることもできます）</label><div class="seg">${PLV.map((v,k)=>`<button class="${k===pr.lv?'on':''}" onclick="pr.lv=${k};draw(1)">${v.toFixed(1)}秒/字</button>`).join('')}</div></div>
      <div class="row"><button class="b p" id="nx" onclick="pBegin()">開始 <kbd>Enter</kbd></button></div></div>`}
-  const b=B[pr.i],head=b.h?(S.settings.showHead?esc(b.h):esc(b.h[0])+' <span class="sub">（見出し非表示）</span>'):'（本文）';
+  const b=B[pr.i],head=headHTML(b);
   h+=`<div class="sub">区切り ${pr.i+1} / ${B.length}・${spc.toFixed(1)}秒/字</div><div class="prompt">${head}</div>`;
   if(pr.ph==='study')
-    return h+`<div class="row" style="align-items:center"><span id="pcd" class="cd">${fmtSec(pr.allot)}</span><span class="sub">${norm(b.t).length}字を ${fmtSec(pr.allot)} で覚える</span><span class="grow"></span><button class="b p" onclick="endStudy(false)">覚えた → テストへ</button></div>
-     <div class="bar cdb" style="margin:8px 0 10px"><i id="pbar" style="width:100%"></i></div><div class="studytext">${esc(b.t)}</div></div>`;
+    return h+`<div class="row" style="align-items:center"><span id="pcd" class="cd">${fmtSec(pr.allot)}</span><span class="sub">${norm(tgt(b)).length}字を ${fmtSec(pr.allot)} で覚える</span><span class="grow"></span><button class="b p" onclick="endStudy(false)">覚えた → テストへ</button></div>
+     <div class="bar cdb" style="margin:8px 0 10px"><i id="pbar" style="width:100%"></i></div><div class="studytext">${esc(tgt(b))}</div></div>`;
   if(pr.ph==='test')
     return h+`<div class="row" style="margin-bottom:6px"><span id="ptm" class="timer">テスト経過 0:00</span><span class="sub">覚えた時間 ${fmtSec(pr.study)}</span></div>
      <textarea id="pans" placeholder="今覚えた内容を入力" oninput="pr.draft=this.value" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();pGrade()}">${esc(pr.draft)}</textarea>
@@ -843,14 +849,14 @@ function vSet(){const st=S.settings;
   <tr><td>合格（緑）とする文字の一致率</td><td><input type="number" min="50" max="100" value="${st.threshold}" onchange="setS('threshold',+this.value)"> % 以上</td></tr>
   <tr><td>番号記号（⑴①イ など）を無視</td><td><input type="checkbox" ${st.ignoreMarks?'checked':''} onchange="setS('ignoreMarks',this.checked)"></td></tr>
   <tr><td>句読点（、。・「」）を無視</td><td><input type="checkbox" ${st.ignorePunct?'checked':''} onchange="setS('ignorePunct',this.checked)"></td></tr>
-  <tr><td>区切りの見出しを表示</td><td><input type="checkbox" ${st.showHead?'checked':''} onchange="setS('showHead',this.checked)"></td></tr></table>
+  <tr><td>見出しも覚える<div class="sub">オン：問いは「（1）」と番号だけ出し、「課税の対象」などの見出しも解答として書く／オフ：見出しを表示する</div></td><td><input type="checkbox" ${memHead()?'checked':''} onchange="setS('memHead',this.checked)"></td></tr></table>
   <p class="sub">合格＝一致率がしきい値以上 かつ AI判定で意味が通っている かつ 禁忌違反なし。空白・改行・全角半角の違いは常に無視します。</p></div>
 
   <div class="card"><h2>データ</h2><p class="sub" style="margin-top:0">理論データ：${DATA?`${ITEMS.length}件（${esc(DATA.source||'')}）`:'未読み込み'}</p>
   <div class="row"><label class="b">理論データ／バックアップを読み込む<input type="file" accept=".json,application/json" style="display:none" onchange="importData(this.files[0])"></label>
   <button class="b" onclick="exportJSON()">記録のバックアップ（JSON）</button><button class="b" onclick="exportCSV()">練習履歴をCSVで書き出す</button></div>
   <p class="sub">旧版（HTMLファイル版）で書き出したバックアップJSONも読み込めます。</p></div>
-  <div class="card sub">消費税法 理論暗記 v2.2.0</div>`}
+  <div class="card sub">消費税法 理論暗記 v2.2.1</div>`}
 function setS(k,v){S.settings[k]=v;S.settings.u=now();saveState()}
 function saveAI(){C.apiKey=document.getElementById('ak').value.trim();C.model=document.getElementById('am').value;C.aiOn=document.getElementById('ao').checked;saveConf();toast('保存しました')}
 async function testAI(){saveAI();const el=document.getElementById('aitest');el.innerHTML='<span class="spin"></span> テスト中…';
