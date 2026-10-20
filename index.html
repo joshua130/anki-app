@@ -197,6 +197,7 @@ const memHead=()=>S.settings.memHead!==false;
 function tgt(b){const p=headParts(b.h);return memHead()&&p&&p.label?p.label+'\n'+b.t:b.t}
 function headHTML(b){if(!b.h)return '（本文）';if(!memHead())return esc(b.h);const p=headParts(b.h);
   const no=p.no?'（'+(p.no.charCodeAt(0)-0x2473)+'）':'';return no+(p.label?' <span class="sub">見出しから書く</span>':'')}
+function headLabel(b){const p=headParts(b.h);return memHead()&&p&&p.label?p.label:''}
 function charsOf(id){return blocksOf(id).reduce((s,b)=>s+norm(tgt(b)).length,0)}
 function mySpeed(){const v=Object.values(ATT).flat().map(speedOf).filter(x=>x);if(v.length<3)return S.settings.targetSpeed;v.sort((a,b)=>a-b);return v[Math.floor(v.length/2)]}
 /* 1回の練習（思い出して書く）にかかる見込み時間（分） */
@@ -348,7 +349,7 @@ function draw(keepScroll){nav();drawSync();const m=document.getElementById('main
   if(!DATA&&tab!=='set'){m.innerHTML=vNoData();return}
   const y=window.scrollY;
   m.innerHTML=pr?vPress():run?vRun():tab==='map'?vMap():tab==='today'?vToday():tab==='press'?vPList():tab==='plan'?vPlan():tab==='log'?vLog():tab==='kinki'?vKinki():vSet();
-  if(pr){if(pr.ph==='test'){const t=document.getElementById('pans');if(t)t.focus({preventScroll:true})}else if(pr.ph!=='study')focusNext();ptick()}
+  if(pr){if(pr.ph==='test'){const t=document.getElementById('phead')||document.getElementById('pans');if(t)t.focus({preventScroll:true})}else if(pr.ph!=='study')focusNext();ptick()}
   else if(run){const t=document.getElementById('ans');if(t)t.focus({preventScroll:true});timerSync()}
   if(keepScroll)window.scrollTo(0,y);else window.scrollTo(0,0)}
 function vNoData(){return `<div class="card"><h2>はじめに：理論データの読み込み</h2>
@@ -583,16 +584,17 @@ function ptick(){ptAdd();if(!pr)return;
   else if(pr.ph==='test'){const el=document.getElementById('ptm');if(el)el.textContent='テスト経過 '+fmtSec(PT.ms/1000)}}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')PT.last=performance.now();else ptAdd()});
 
-function pNew(id){return {id,lv:pLevel(id),ph:'ready',i:0,res:[],draft:'',g:null}}
+function pNew(id){return {id,lv:pLevel(id),ph:'ready',i:0,res:[],draft:'',hdraft:'',g:null}}
 function pQueue(ids){ids=(ids||[]).filter(id=>BYID[id]);if(!ids.length)return;run=null;TM.on=false;pr={queue:ids,qi:0,...pNew(ids[0])};draw()}
 function pNextQ(){const q=pr.queue,qi=pr.qi+1;pr={queue:q,qi,...pNew(q[qi])};draw()}
-function pBegin(){if(!pr)return;pr.ph='study';pr.allot=pAllot(blocksOf(pr.id)[pr.i],PLV[pr.lv]);pr.draft='';pTimer(true);draw()}
+function pBegin(){if(!pr)return;pr.ph='study';pr.allot=pAllot(blocksOf(pr.id)[pr.i],PLV[pr.lv]);pr.draft='';pr.hdraft='';pTimer(true);draw()}
 function endStudy(auto){if(!pr||pr.ph!=='study')return;ptAdd();
   pr.study=Math.min(pr.allot,Math.round(PT.ms/100)/10);pr.ph='test';pTimer(true);draw();if(auto)toast('時間です。すぐに書いてください')}
 function pGrade(){if(!pr||pr.ph!=='test')return;ptAdd();PT.on=false;
-  const b=blocksOf(pr.id)[pr.i],input=pr.draft||'',d=diff(norm(tgt(b)),norm(input));
+  const b=blocksOf(pr.id)[pr.i],hl=headLabel(b),input=hl?(pr.hdraft||'')+'\n'+(pr.draft||''):(pr.draft||''),d=diff(norm(tgt(b)),norm(input));
+  const hd=hl?diff(norm(hl),norm(pr.hdraft||'')):null;
   const st=!C.pressAI?'poff':aiReady()?'pending':'off';
-  pr.g={...d,input,sec:PT.ms/1000,helped:false,ai:null,aiState:st,manual:null};pr.ph='graded';draw();if(st==='pending')runAI()}
+  pr.g={...d,input,hd,hin:pr.hdraft||'',sec:PT.ms/1000,helped:false,ai:null,aiState:st,manual:null};pr.ph='graded';draw();if(st==='pending')runAI()}
 function pNext(){const g=pr&&pr.g;if(!g||g.aiState==='pending')return;const b=blocksOf(pr.id)[pr.i];
   pr.res.push({h:b.h||'',n:g.n,m:g.match,acc:Math.round(g.acc*10)/10,pass:passOf(g),allot:pr.allot,study:pr.study,test:Math.round(g.sec),
     ai:g.ai?{ok:g.ai.meaning_ok,score:g.ai.meaning_score,kinki:g.ai.kinki_violations.map(k=>k.rule)}:null});
@@ -622,13 +624,15 @@ function vPress(){const it=BYID[pr.id],B=blocksOf(pr.id),spc=PLV[pr.lv];
      <div class="bar cdb" style="margin:8px 0 10px"><i id="pbar" style="width:100%"></i></div><div class="studytext">${esc(tgt(b))}</div></div>`;
   if(pr.ph==='test')
     return h+`<div class="row" style="margin-bottom:6px"><span id="ptm" class="timer">テスト経過 0:00</span><span class="sub">覚えた時間 ${fmtSec(pr.study)}</span></div>
+     ${headLabel(b)?`<div class="field" style="margin-top:0"><label>見出し</label><input type="text" id="phead" value="${esc(pr.hdraft)}" placeholder="見出しを入力（例：課税の対象）" oninput="pr.hdraft=this.value" onkeydown="if(event.isComposing)return;if(event.key==='Enter'){event.preventDefault();if(event.ctrlKey||event.metaKey)pGrade();else document.getElementById('pans').focus()}"></div><label class="sub">本文</label>`:''}
      <textarea id="pans" placeholder="今覚えた内容を入力" oninput="pr.draft=this.value" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();pGrade()}">${esc(pr.draft)}</textarea>
      <div class="row" style="margin-top:10px"><button class="b p" onclick="pGrade()">採点 <kbd>Ctrl/⌘+Enter</kbd></button></div></div>`;
   const g=pr.g,pass=passOf(g);
   return h+`<div class="row" style="margin:6px 0 8px"><span class="big ${pass?'ok':'ng'}">${pass?'○':'×'} ${pct(g.acc)}</span>
-   <span class="sub">覚えた時間 ${fmtSec(pr.study)}／${fmtSec(pr.allot)}・テスト ${fmtSec(g.sec)}<br>脱落 ${g.miss}字・余分 ${g.extra}字／正解 ${g.n}字</span><span class="grow"></span>
+   <span class="sub">覚えた時間 ${fmtSec(pr.study)}／${fmtSec(pr.allot)}・テスト ${fmtSec(g.sec)}<br>脱落 ${g.miss}字・余分 ${g.extra}字／正解 ${g.n}字（見出しを含む）</span><span class="grow"></span>
    <button class="b s" onclick="g_flip()">${pass?'×にする':'○にする'}</button></div>
    <div class="sub" style="margin-bottom:6px"><span style="background:var(--miss);padding:0 4px">赤＝書けなかった</span>　<span style="background:var(--extra);text-decoration:line-through;padding:0 4px">灰＝余分</span></div>
+   ${g.hd?`<div style="margin-bottom:6px">見出し：${g.hd.miss||g.hd.extra?'<span class="ng">×</span>':'<span class="ok">○</span>'} 正解「${esc(headLabel(b))}」${g.hd.miss||g.hd.extra?`／あなた「${esc(g.hin)||'（空欄）'}」`:''}</div>`:''}
    <div class="diff">${renderDiff(g.ops)}</div>${vAI(g)}
    <div class="row" style="margin-top:12px"><button class="b p" id="nx" onclick="pNext()" ${g.aiState==='pending'?'disabled':''}>${pr.i+1<B.length?'次の区切りへ（すぐ表示が始まります）':'結果を記録'} <kbd>Enter</kbd></button>
    ${g.aiState==='pending'?`<button class="b" onclick="g_skipAI()">AI判定を待たずに進む</button>`:''}</div></div>`}
@@ -856,7 +860,7 @@ function vSet(){const st=S.settings;
   <div class="row"><label class="b">理論データ／バックアップを読み込む<input type="file" accept=".json,application/json" style="display:none" onchange="importData(this.files[0])"></label>
   <button class="b" onclick="exportJSON()">記録のバックアップ（JSON）</button><button class="b" onclick="exportCSV()">練習履歴をCSVで書き出す</button></div>
   <p class="sub">旧版（HTMLファイル版）で書き出したバックアップJSONも読み込めます。</p></div>
-  <div class="card sub">消費税法 理論暗記 v2.2.1</div>`}
+  <div class="card sub">消費税法 理論暗記 v2.2.3</div>`}
 function setS(k,v){S.settings[k]=v;S.settings.u=now();saveState()}
 function saveAI(){C.apiKey=document.getElementById('ak').value.trim();C.model=document.getElementById('am').value;C.aiOn=document.getElementById('ao').checked;saveConf();toast('保存しました')}
 async function testAI(){saveAI();const el=document.getElementById('aitest');el.innerHTML='<span class="spin"></span> テスト中…';
