@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#256e4e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="理論暗記">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<title>消費税法 理論暗記</title>
+<style>
+:root{color-scheme:light;--bg:#f4f3ef;--card:#fff;--ink:#1f2328;--sub:#646b73;--line:#e2e0da;--brand:#256e4e;--brands:#e2efe8;
+ --g:47,143,91;--r:200,71,58;--warn:#a26b00;--miss:#ffd6cf;--extra:#dcdcdc}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;font-size:15px;line-height:1.7;padding-bottom:env(safe-area-inset-bottom)}
+header{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line);padding:calc(8px + env(safe-area-inset-top)) 16px 8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+header h1{font-size:16px;margin:0}
+nav{display:flex;gap:2px;flex-wrap:wrap}
+nav button{border:none;background:none;color:var(--sub);padding:8px 12px;border-radius:8px;font:inherit;cursor:pointer;min-height:40px}
+nav button.on{background:var(--brands);color:var(--brand);font-weight:700}
+.grow{flex:1}
+#sync{font-size:12px;color:var(--sub);cursor:pointer;padding:6px 8px;border-radius:6px}
+#sync.err{color:rgb(var(--r))}
+main{max-width:1100px;margin:0 auto;padding:16px 16px 100px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:14px}
+h2{font-size:17px;margin:0 0 10px}h3{font-size:15px;margin:0 0 6px}
+.sub{color:var(--sub);font-size:13px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+button.b,label.b{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;border-radius:9px;cursor:pointer;min-height:40px;display:inline-flex;align-items:center;gap:6px}
+button.b:hover{border-color:var(--brand)}
+button.p{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:700}
+button.s{padding:4px 10px;font-size:13px;min-height:34px}
+button.danger{color:rgb(var(--r))}
+button:disabled{opacity:.4;cursor:default}
+input[type=text],input[type=password],input[type=number],select,textarea{font:inherit;font-size:15px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+input[type=text],input[type=password]{width:100%}
+textarea{width:100%;min-height:160px;font-size:17px;line-height:1.85;padding:12px;resize:vertical}
+textarea:focus,input:focus{outline:2px solid var(--brand);border-color:transparent}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-size:12px;color:var(--sub);font-weight:600}
+td.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.star{color:var(--warn);letter-spacing:-2px;white-space:nowrap}
+.ok{color:rgb(var(--g));font-weight:700}.ng{color:rgb(var(--r));font-weight:700}
+.pill{display:inline-block;padding:0 9px;border-radius:99px;font-size:12px;background:var(--brands);color:var(--brand);white-space:nowrap}
+.pill.ng{background:#f8e2de;color:rgb(var(--r))}.pill.w{background:#fbefd5;color:var(--warn)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.stat{background:var(--bg);border-radius:9px;padding:10px 12px}.stat b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
+/* map */
+.legend{display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--sub)}
+.legend i{display:inline-block;width:16px;height:16px;border-radius:4px;border:1px solid var(--line);vertical-align:-3px;margin-right:4px}
+.fade{display:inline-flex;gap:2px;vertical-align:-3px;margin-right:4px}.fade i{margin:0;width:12px}
+.ch{margin:18px 0 8px;font-weight:700;font-size:14px;color:var(--sub)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.grid.sec{grid-template-columns:repeat(auto-fill,minmax(118px,1fr))}
+.tile{position:relative;border:1px solid var(--line);border-radius:10px;padding:8px 10px 10px;min-height:86px;cursor:pointer;background:#fff;display:flex;flex-direction:column;gap:4px;transition:transform .08s;user-select:none}
+.tile:active{transform:scale(.97)}
+.tile .no{font-weight:800;font-size:15px;font-variant-numeric:tabular-nums}
+.tile .tt{font-size:12px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tile .meta{font-size:11px;margin-top:auto;opacity:.85}
+.tile.dark{color:#fff;border-color:transparent}.tile.dark .star{color:#ffe08a}
+.tile .segs{display:flex;gap:2px}.tile .segs span{flex:1;height:7px;border-radius:2px;border:1px solid rgba(0,0,0,.12);background:#fff}
+.slow{display:inline-block;font-size:10px;font-weight:700;line-height:15px;padding:0 4px;border-radius:4px;background:#fbefd5;color:#8a5a00;vertical-align:1px}
+.timer{font-variant-numeric:tabular-nums;font-weight:700;font-size:15px}
+.timer.over{color:var(--warn)}
+.bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden}.bar i{display:block;height:100%;background:var(--brand)}
+.day{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.day.today{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand) inset}
+.kind{display:inline-block;font-size:11px;padding:0 6px;border-radius:4px;margin-right:4px;white-space:nowrap}
+.k-new{background:#e6eefb;color:#2a5aa8}.k-review{background:var(--brands);color:var(--brand)}.k-fix{background:#f8e2de;color:rgb(var(--r))}.k-speed{background:#fbefd5;color:#8a5a00}
+.tile .dot{position:absolute;top:7px;right:8px;width:9px;height:9px;border-radius:50%;background:var(--warn);box-shadow:0 0 0 2px #fff}
+.qhead{grid-column:1/-1;font-size:13px;font-weight:700;margin-top:6px}
+/* sheet */
+#sheet{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.35);display:none;align-items:flex-end;justify-content:center}
+#sheet.on{display:flex}
+#sheet .in{background:var(--card);width:min(760px,100%);max-height:86vh;overflow:auto;border-radius:16px 16px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom))}
+@media (min-width:800px){#sheet{align-items:center}#sheet .in{border-radius:16px}}
+.sw{display:inline-block;width:22px;height:22px;border-radius:5px;border:1px solid var(--line);vertical-align:middle}
+/* practice */
+.prompt{font-weight:700;font-size:17px;margin:6px 0}
+.prog{display:flex;gap:4px;margin:8px 0 10px;flex-wrap:wrap}.prog span{width:28px;height:6px;border-radius:3px;background:var(--line)}
+.prog span.cur{background:var(--sub)}.prog span.ok{background:rgb(var(--g))}.prog span.ng{background:rgb(var(--r))}
+.diff{white-space:pre-wrap;word-break:break-all;background:var(--bg);border-radius:9px;padding:12px;font-size:16px;line-height:1.95}
+.diff .m{background:var(--miss);border-radius:2px}.diff .x{background:var(--extra);text-decoration:line-through;color:var(--sub);border-radius:2px}
+.answer{white-space:pre-wrap;background:var(--bg);border-radius:9px;padding:12px}
+.big{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums}
+.hint{color:var(--warn)}
+.ai{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:12px;background:#fbfbf9}
+.ai h4{margin:0 0 6px;font-size:14px}
+.ai ul{margin:4px 0 4px 18px;padding:0}.ai li{margin:4px 0}
+.kinki{border-left:4px solid rgb(var(--r));background:#fdf1ef;padding:6px 10px;border-radius:4px;margin:6px 0}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:sp 0.8s linear infinite;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+kbd{font-size:11px;border:1px solid currentColor;border-radius:4px;padding:0 4px;opacity:.7;font-family:inherit}
+.empty{color:var(--sub);text-align:center;padding:22px}
+details summary{cursor:pointer;color:var(--sub);font-size:13px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}.seg button{border:none;background:#fff;padding:7px 12px;font:inherit;font-size:13px;cursor:pointer}.seg button.on{background:var(--brand);color:#fff}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#222;color:#fff;padding:9px 16px;border-radius:10px;font-size:14px;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:.95}
+.field{margin:10px 0}.field label{display:block;font-size:13px;color:var(--sub);margin-bottom:3px}
+@media (max-width:640px){.hide-sm{display:none}.grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}}
+</style>
+</head>
+<body>
+<header><h1>消費税法 理論暗記</h1><nav id="nav"></nav><span class="grow"></span><span id="sync" onclick="syncNow(true)"></span></header>
+<main id="main"></main>
+<div id="sheet" onclick="if(event.target===this)closeSheet()"><div class="in" id="sheetIn"></div></div>
+<div class="toast" id="toast"></div>
+<script>
+'use strict';
+/* =========================================================
+   保存領域
+   - anki2-data   : 理論データ（PDFから抽出したもの。公開サーバーには置かない）
+   - anki2-state  : 記録（同期対象）
+   - anki2-config : APIキー・トークンなど端末ローカルの設定（同期しない）
+   ========================================================= */
+const K_DATA='anki2-data',K_STATE='anki2-state',K_CONF='anki2-config';
+const ld=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}};
+const sv=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){toast('保存に失敗しました: '+e.message);return false}};
+const now=()=>Date.now();
+const uid=()=>now().toString(36)+Math.random().toString(36).slice(2,8);
+
+const DEFAULT_KINKI=[
+ '「及び」「並びに」「又は」「若しくは」を取り違えない',
+ '「以上」「超」「以下」「未満」を取り違えない',
+ '期間の起算点・終期（「日」「前日」「前々日」「翌日」、「経過する日」「経過した日」）を取り違えない',
+ '「しなければならない」「することができる」「するものとする」を取り違えない',
+ '「とみなす」と「とする」を取り違えない',
+ '主体（事業者・課税事業者・免税事業者・税務署長 等）を取り違えない',
+ '除外の括弧書き（「〜を除く。」）を落として適用範囲を変えない',
+ '数値・割合・金額（１千万円、５億円、95％、２年 等）を誤らない',
+ '助詞（てにをは）の誤りで主語・目的語・要件と効果の関係を変えない'
+];
+function initState(){const t=now(),k={};DEFAULT_KINKI.forEach(x=>{const id=uid();k[id]={scope:'g',text:x,u:t}});
+  return {v:2,attempts:{},deleted:{},plan:{},overrides:{},kinki:k,settings:{threshold:90,ignorePunct:false,ignoreMarks:true,showHead:true,u:0}}}
+let DATA=ld(K_DATA,null);
+let S=ld(K_STATE,null)||initState();
+const DEF_SET={threshold:90,ignorePunct:false,ignoreMarks:true,showHead:true,targetSpeed:40,examDate:'',minWeekday:60,minWeekend:120,horizon:14,learnRate:12};
+S.settings=Object.assign({},DEF_SET,S.settings);S.schedule=S.schedule||null;
+let C=Object.assign({model:'claude-sonnet-5-5',aiOn:true,apiKey:'',ghOwner:'',ghRepo:'',ghToken:'',device:'',view:'q'},ld(K_CONF,{}));
+let ITEMS=[],BYID={},QS=[],ATT={};
+function setData(d){DATA=d;ITEMS=d?d.items:[];BYID=Object.fromEntries(ITEMS.map(i=>[i.id,i]));
+  const seen={};QS=[];ITEMS.forEach(i=>{if(!seen[i.q]){seen[i.q]={q:i.q,qt:i.qt,ch:i.ch,items:[]};QS.push(seen[i.q])}seen[i.q].items.push(i)})}
+setData(DATA);
+function reindex(){ATT={};for(const a of Object.values(S.attempts)){if(S.deleted[a.uid])continue;(ATT[a.id]=ATT[a.id]||[]).push(a)}
+  for(const k in ATT)ATT[k].sort((x,y)=>x.ts-y.ts)}
+reindex();
+let dirty=false;
+function saveState(){sv(K_STATE,S);dirty=true;reindex();scheduleSync()}
+function saveConf(){sv(K_CONF,C)}
+
+/* ---------- 日付ユーティリティ ---------- */
+const pad=n=>String(n).padStart(2,'0');
+const ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const TODAY=()=>ymd(new Date());
+const addDays=(s,n)=>{const d=new Date(s+'T00:00:00');d.setDate(d.getDate()+n);return ymd(d)};
+const daysBetween=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/864e5);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const stars=n=>n?'<span class="star">'+'★'.repeat(n)+'</span>':'';
+const pct=v=>v==null?'–':Math.round(v)+'%';
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),2600)}
+
+/* ---------- 理論ごとの状態 ---------- */
+function blocksOf(id){return (S.overrides[id]&&S.overrides[id].blocks)||BYID[id].blocks}
+function attemptsOf(id){return ATT[id]||[]}
+function lastOf(id){const a=attemptsOf(id);return a.length?a[a.length-1]:null}
+/* ---------- 速度（字/分）と復習間隔 ----------
+   速度 = 正しく書けた文字数 ÷ 実際に考えて書いていた時間（分）
+   合格でも遅い（目標速度の75%未満）場合は「まだ思い出すのに苦労している」とみなし、間隔を伸ばさない */
+const STEPS=[1,3,7,14,30,60];
+function speedOf(a){if(!a||!a.sec)return null;const n=(a.blocks||[]).reduce((s,b)=>s+(b.m!=null?b.m:(b.n||0)*(b.acc||0)/100),0);return n?n/(a.sec/60):null}
+function speedClass(a){const v=speedOf(a),t=S.settings.targetSpeed;if(v==null)return 'na';if(v<t*.75)return 'slow';if(v<t)return 'mid';return 'fast'}
+function quality(a){if(!a.pass)return 'fail';const c=speedClass(a);if(c==='slow')return 'slow';if(c==='fast'&&a.acc>=97)return 'great';return 'good'}
+function srsOf(id){const A=attemptsOf(id);if(!A.length)return null;let i=-1;
+  for(const a of A){const q=quality(a);i=q==='fail'?0:q==='slow'?Math.max(i,0):Math.min(i+(q==='great'?2:1),STEPS.length-1)}
+  return {iv:STEPS[i],due:addDays(A[A.length-1].date,STEPS[i]),q:quality(A[A.length-1])}}
+const fmtSec=s=>{s=Math.round(s||0);return s>=3600?`${Math.floor(s/3600)}時間${Math.round(s%3600/60)}分`:`${Math.floor(s/60)}:${pad(s%60)}`};
+const fmtMin=m=>m>0&&m<1?"1分未満":m>=60?`${Math.floor(m/60)}時間${Math.round(m%60)}分`:`${Math.round(m)}分`;
+function charsOf(id){return blocksOf(id).reduce((s,b)=>s+norm(b.t).length,0)}
+function mySpeed(){const v=Object.values(ATT).flat().map(speedOf).filter(x=>x);if(v.length<3)return S.settings.targetSpeed;v.sort((a,b)=>a-b);return v[Math.floor(v.length/2)]}
+/* 1回の練習（思い出して書く）にかかる見込み時間（分） */
+function estPractice(id){const A=attemptsOf(id).filter(a=>a.sec).slice(-3);
+  if(A.length){const s=A.map(a=>a.sec).sort((a,b)=>a-b)[Math.floor(A.length/2)];return Math.max(1,s/60)}
+  return Math.max(1,charsOf(id)/mySpeed())}
+/* 新規に覚える場合の見込み時間（読み込み＋練習） */
+function estNew(id){return Math.max(3,charsOf(id)/S.settings.learnRate)+estPractice(id)}
+function estFor(id){return attemptsOf(id).length?estPractice(id):estNew(id)}
+function planOf(d=TODAY()){return (S.plan[d]&&S.plan[d].ids)||[]}
+function setPlan(ids,d=TODAY()){S.plan[d]={ids:[...new Set(ids)],u:now()};saveState()}
+function bestOn(id,d){let b=null;for(const a of attemptsOf(id))if(a.date===d&&(!b||a.acc>b.acc))b=a;return b}
+function dueList(){const t=TODAY();return ITEMS.filter(i=>{const s=srsOf(i.id);return s&&s.due<=t}).map(i=>i.id)}
+function kinkiFor(id){return Object.entries(S.kinki).filter(([k,v])=>!v.del&&(v.scope==='g'||v.scope===id)).map(([k,v])=>({k,...v}))}
+
+/* ---------- 色（精度）と濃度（経過日数） ---------- */
+const FADE=[[0,1],[1,.82],[3,.64],[7,.46],[14,.32],[30,.2],[1e9,.12]];
+function alphaOf(days){for(const [d,a] of FADE)if(days<=d)return a;return .12}
+function toneStyle(st){ // st: null | {pass,days}
+  if(!st)return {style:'',dark:false};
+  const a=alphaOf(st.days),c=st.pass?'var(--g)':'var(--r)';
+  return {style:`background:rgba(${c},${a});border-color:rgba(${c},${Math.min(1,a+.15)})`,dark:a>=.6};
+}
+function isSlowA(a){return !!(a&&a.pass&&speedClass(a)==='slow')}
+function isSlow(id){const l=lastOf(id);return !!(l&&l.pass&&speedClass(l)==='slow')}
+function itemStatus(id){const l=lastOf(id);if(!l)return null;return {pass:l.pass,acc:l.acc,days:daysBetween(l.date,TODAY()),date:l.date}}
+function qStatus(q){const st=q.items.map(i=>itemStatus(i.id)).filter(Boolean);if(!st.length)return null;
+  return {pass:st.every(s=>s.pass),acc:st.reduce((s,x)=>s+x.acc,0)/st.length,days:Math.max(...st.map(s=>s.days)),done:st.length,total:q.items.length}}
+
+/* =========================================================
+   採点（文字比較）
+   ========================================================= */
+const MARK_RE=/^[\s　]*(?:[⑴-⒇]|[①-⑳]|[イロハニホヘトチリヌ](?=[\s　])|（注[0-9０-９\s]*）|※[0-9０-９]*)[\s　]*/gm;
+function norm(s){if(S.settings.ignoreMarks)s=s.replace(MARK_RE,'');s=s.normalize('NFKC').replace(/\s+/g,'');
+  if(S.settings.ignorePunct)s=s.replace(/[、。,.，．・「」『』]/g,'');return s}
+function diff(target,input){
+  const a=[...target],b=[...input],n=a.length,m=b.length,W=m+1,dp=new Uint16Array((n+1)*(m+1));
+  for(let i=n-1;i>=0;i--)for(let j=m-1;j>=0;j--)dp[i*W+j]=a[i]===b[j]?dp[(i+1)*W+j+1]+1:Math.max(dp[(i+1)*W+j],dp[i*W+j+1]);
+  const ops=[];let i=0,j=0;
+  while(i<n||j<m){if(i<n&&j<m&&a[i]===b[j]){ops.push(['=',a[i]]);i++;j++}
+    else if(j<m&&(i>=n||dp[i*W+j+1]>=dp[(i+1)*W+j])){ops.push(['x',b[j]]);j++}else{ops.push(['m',a[i]]);i++}}
+  const match=dp[0],extra=m-match;return {ops,acc:n?100*match/(n+extra):(m?0:100),match,miss:n-match,extra,n};
+}
+function renderDiff(ops){let h='',cur=null,buf='';const fl=()=>{if(!buf)return;h+=cur==='='?esc(buf):`<span class="${cur}">${esc(buf)}</span>`;buf=''};
+  for(const [t,c] of ops){if(t!==cur){fl();cur=t}buf+=c}fl();return h}
+
+/* =========================================================
+   AI判定（Claude API）
+   ========================================================= */
+const AI_SYS=`あなたは税理士試験「消費税法」理論の採点者です。受験生が理論テキスト（条文に沿った規定）を暗記して書いた解答を、正解テキストと比較して判定します。
+
+判定方針:
+- 句読点、番号記号、同義で法的意味が変わらない軽微な言い換えは許容します。
+- 次のような「法的な意味が変わる誤り」は重大な誤り（critical_errors）として必ず指摘します：
+  てにをは（助詞）の誤りによる主語・目的語・要件と効果の関係の変化、「及び／並びに／又は／若しくは」の取違え、
+  「以上／超／以下／未満」、日付・期間の起算点や終期（日／前日／前々日／翌日、経過する日／経過した日）、
+  数値・割合・金額、主体（誰が）、「しなければならない／できる／ものとする」、「とみなす／とする」、
+  除外の括弧書きの欠落による適用範囲の変化、否定と肯定の逆転、要件と効果の入れ替わり。
+- 単に書かれていない部分は omissions（脱落）として、重要なものだけ簡潔に列挙します。
+- 「禁忌事項」が与えられた場合、解答がそれに違反していれば kinki_violations に、違反した禁忌事項の文言をそのまま rule に入れて記載します。
+- meaning_ok は、書かれた内容に重大な誤りがなく、かつ規定の要件・効果の骨格が成立している場合に true とします。
+- 解答が空や無関係な場合は meaning_ok=false とします。
+
+出力は次のJSONオブジェクトのみ（前後に文章やコードフェンスを付けない）:
+{"meaning_ok":true/false,"meaning_score":0〜100の整数（法的意味の再現度）,"critical_errors":[{"correct":"正解の該当箇所","written":"解答の該当箇所","reason":"意味がどう変わるか"}],"omissions":["脱落した重要部分"],"kinki_violations":[{"rule":"違反した禁忌事項","written":"解答の該当箇所","reason":"理由"}],"comment":"60字以内の講評"}`;
+async function callAI(item,block,input){
+  const kk=kinkiFor(item.id);
+  const user=`【理論】${item.q}〔${item.no}〕${item.title}${block.h?'／'+block.h:''}
+【禁忌事項】
+${kk.length?kk.map((k,i)=>`${i+1}. ${k.text}`).join('\n'):'（なし）'}
+【正解テキスト】
+${block.t}
+【受験生の解答】
+${input||'（空欄）'}`;
+  const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':C.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:C.model,max_tokens:2000,system:AI_SYS,messages:[{role:'user',content:user}]})});
+  if(!r.ok){let m='';try{m=(await r.json()).error.message}catch(e){}throw new Error('API '+r.status+(m?': '+m:''))}
+  const j=await r.json();const txt=(j.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('');
+  const s=txt.indexOf('{'),e=txt.lastIndexOf('}');if(s<0)throw new Error('AIの応答を解釈できませんでした');
+  const o=JSON.parse(txt.slice(s,e+1));
+  return {meaning_ok:!!o.meaning_ok,meaning_score:+o.meaning_score||0,critical_errors:o.critical_errors||[],omissions:o.omissions||[],kinki_violations:o.kinki_violations||[],comment:o.comment||''};
+}
+const aiReady=()=>C.aiOn&&C.apiKey&&navigator.onLine;
+
+/* =========================================================
+   GitHub 同期（非公開リポジトリに records.json / theory.json）
+   ========================================================= */
+const ghReady=()=>C.ghOwner&&C.ghRepo&&C.ghToken;
+const b64e=s=>{const b=new TextEncoder().encode(s);let r='';for(let i=0;i<b.length;i+=0x8000)r+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));return btoa(r)};
+const b64d=s=>{const bin=atob(s.replace(/\n/g,''));const b=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)b[i]=bin.charCodeAt(i);return new TextDecoder().decode(b)};
+async function gh(path,opt={}){const r=await fetch(`https://api.github.com/repos/${encodeURIComponent(C.ghOwner)}/${encodeURIComponent(C.ghRepo)}/contents/${path}`,
+  {...opt,headers:{'Authorization':'Bearer '+C.ghToken,'Accept':opt.raw?'application/vnd.github.raw+json':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28',...(opt.body?{'Content-Type':'application/json'}:{})},cache:'no-store'});
+  return r}
+async function ghGet(path){const r=await gh(path);if(r.status===404)return {sha:null,text:null};if(!r.ok)throw new Error('GitHub '+r.status);
+  const j=await r.json();let text;if(j.content&&j.encoding==='base64')text=b64d(j.content);else{const rr=await gh(path,{raw:true});if(!rr.ok)throw new Error('GitHub '+rr.status);text=await rr.text()}
+  return {sha:j.sha,text}}
+async function ghPut(path,text,sha,msg){const r=await gh(path,{method:'PUT',body:JSON.stringify({message:msg,content:b64e(text),...(sha?{sha}:{})})});
+  if(r.status===409||r.status===422)return false;if(!r.ok)throw new Error('GitHub '+r.status);return true}
+function lww(a,b){const o={...a};for(const k in b){if(!o[k]||(b[k].u||0)>(o[k].u||0))o[k]=b[k]}return o}
+function merge(L,R){if(!R)return L;
+  const deleted={...L.deleted,...R.deleted};const attempts={...R.attempts,...L.attempts};for(const k in deleted)delete attempts[k];
+  return {v:2,attempts,deleted,plan:lww(L.plan,R.plan),overrides:lww(L.overrides,R.overrides),kinki:lww(L.kinki,R.kinki),
+    settings:Object.assign({},DEF_SET,(R.settings&&(R.settings.u||0)>(L.settings.u||0))?R.settings:L.settings),
+    schedule:(R.schedule&&(!L.schedule||(R.schedule.u||0)>(L.schedule.u||0)))?R.schedule:(L.schedule||null)}}
+let syncing=false,syncTimer=null,syncState={t:0,err:''};
+function scheduleSync(){if(!ghReady())return;clearTimeout(syncTimer);syncTimer=setTimeout(()=>syncNow(false),2500)}
+async function syncNow(manual){
+  if(!ghReady()){if(manual){tab='set';draw()}return}
+  if(!navigator.onLine){syncState.err='オフライン';drawSync();return}
+  if(syncing)return;syncing=true;drawSync();
+  try{
+    for(let tries=0;tries<4;tries++){
+      const rem=await ghGet('records.json');const R=rem.text?JSON.parse(rem.text):null;
+      const M=merge(S,R);const out=JSON.stringify(M);
+      if(rem.text===out){S=M;break}
+      if(await ghPut('records.json',out,rem.sha,`sync from ${C.device||'device'}`)){S=M;break}
+      if(tries===3)throw new Error('競合が解消できませんでした');
+    }
+    sv(K_STATE,S);reindex();dirty=false;
+    // 理論データ
+    const remT=await ghGet('theory.json');
+    if(!remT.text&&DATA){await ghPut('theory.json',JSON.stringify(DATA),null,'upload theory data')}
+    else if(remT.text){const RD=JSON.parse(remT.text);
+      if(!DATA||(RD.updated||0)>(DATA.updated||0)){setData(RD);sv(K_DATA,RD);toast('理論データを同期しました')}
+      else if((DATA.updated||0)>(RD.updated||0)){await ghPut('theory.json',JSON.stringify(DATA),remT.sha,'update theory data')}}
+    syncState={t:now(),err:''};if(manual)toast('同期しました');
+    if(!run)draw();
+  }catch(e){syncState.err=e.message;if(manual)toast('同期エラー: '+e.message)}
+  finally{syncing=false;drawSync()}
+}
+function drawSync(){const el=document.getElementById('sync');if(!ghReady()){el.textContent='同期：未設定';el.className='';return}
+  if(syncing){el.innerHTML='<span class="spin"></span> 同期中';el.className='';return}
+  if(syncState.err){el.textContent='同期エラー（タップで再試行）';el.className='err';return}
+  el.textContent=syncState.t?('同期済み '+new Date(syncState.t).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})):'タップで同期';el.className=''}
+window.addEventListener('online',()=>syncNow(false));
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')syncNow(false)});
+
+/* =========================================================
+   画面
+   ========================================================= */
+let tab='map',run=null;
+const TABS=[['map','マップ'],['today','今日の暗記'],['plan','スケジュール'],['log','記録'],['kinki','禁忌事項'],['set','設定']];
+function nav(){document.getElementById('nav').innerHTML=TABS.map(([k,v])=>`<button class="${tab===k&&!run?'on':''}" onclick="go('${k}')">${v}</button>`).join('')}
+function go(k){if(run&&run.res.length<blocksOf(run.id).length&&(run.res.length||run.graded)&&!confirm('練習を中断しますか？（この理論の途中経過は記録されません）'))return;run=null;TM.on=false;TM.ms=0;tab=k;draw()}
+function draw(keepScroll){nav();drawSync();const m=document.getElementById('main');
+  if(!DATA&&tab!=='set'){m.innerHTML=vNoData();return}
+  const y=window.scrollY;
+  m.innerHTML=run?vRun():tab==='map'?vMap():tab==='today'?vToday():tab==='plan'?vPlan():tab==='log'?vLog():tab==='kinki'?vKinki():vSet();
+  if(run){const t=document.getElementById('ans');if(t)t.focus({preventScroll:true});timerSync()}
+  if(keepScroll)window.scrollTo(0,y);else window.scrollTo(0,0)}
+function vNoData(){return `<div class="card"><h2>はじめに：理論データの読み込み</h2>
+ <p>理論テキストから作成した <b>理論データ.json</b> を読み込んでください。</p>
+ <div class="row"><label class="b p">理論データを読み込む<input type="file" accept=".json,application/json" style="display:none" onchange="importData(this.files[0])"></label>
+ <button class="b" onclick="go('set')">同期を設定する（他の端末で読み込み済みの場合）</button></div>
+ <p class="sub">理論データは著作物を含むため、アプリの公開サーバーには置かず、この端末と（設定した場合は）あなた専用の非公開リポジトリにだけ保存されます。</p></div>`}
+function importData(f){if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);
+  if(d.format==='anki-shohi-data'&&Array.isArray(d.items)){d.updated=d.updated||now();setData(d);sv(K_DATA,d);toast(`理論 ${d.items.length} 件を読み込みました`);scheduleSync();tab='map';draw()}
+  else if(d.attempts){importBackup(d)}else throw 0}catch(e){toast('読み込めませんでした')}};r.readAsText(f)}
+
+/* ---------- マップ ---------- */
+function legend(){const f=[0,3,7,14,30];
+  return `<div class="legend"><span><i style="background:#fff"></i>未実施</span>
+  <span><i style="background:rgb(var(--r))"></i>${S.settings.threshold}%未満・禁忌違反</span><span><i style="background:rgb(var(--g))"></i>${S.settings.threshold}%以上</span>
+  <span><span class="fade">${f.map(d=>`<i style="background:rgba(var(--g),${alphaOf(d)})"></i>`).join('')}</span>濃い＝最近 → 薄い＝実施から日が経過</span>
+  <span><span class="dot" style="position:static;display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--warn);margin-right:4px"></span>今日の予定</span><span><span class="slow">遅</span> 正確だが時間がかかった（目標 ${S.settings.targetSpeed}字/分の75%未満）</span></div>`}
+function vMap(){
+  const p=new Set(planOf());let h=`<div class="card"><div class="row"><div class="seg"><button class="${C.view==='q'?'on':''}" onclick="C.view='q';saveConf();draw(1)">問題ごと（1-1, 1-2…）</button><button class="${C.view==='s'?'on':''}" onclick="C.view='s';saveConf();draw(1)">セクションごと（〔1〕〔2〕…）</button></div>
+   <span class="grow"></span><span class="sub">今日の予定 ${p.size}件</span><button class="b s p" onclick="go('today')">今日の暗記へ</button></div>
+   <div style="margin-top:10px">${legend()}</div></div>`;
+  let lastCh='';
+  if(C.view==='q'){
+    h+=`<div class="card">`;
+    for(const q of QS){const ch=q.q.split('-')[0];if(ch!==lastCh){if(lastCh)h+=`</div>`;lastCh=ch;h+=`<div class="ch">${ch}　${esc(q.ch)}</div><div class="grid">`}
+      const st=qStatus(q),t=toneStyle(st),inPlan=q.items.some(i=>p.has(i.id)),mx=Math.max(...q.items.map(i=>i.stars));
+      h+=`<div class="tile ${t.dark?'dark':''}" style="${t.style}" onclick="openQ('${q.q}')">${inPlan?'<span class="dot"></span>':''}
+        <div class="no">${q.q} ${stars(mx)}</div><div class="tt">${esc(q.qt)}</div>
+        <div class="segs">${q.items.map(i=>{const s=toneStyle(itemStatus(i.id));return `<span style="${s.style}"></span>`}).join('')}</div>
+        <div class="meta">${st?`${pct(st.acc)}・${st.done}/${st.total}・${st.days?st.days+'日前':'今日'}`:'未実施'}${q.items.some(i=>isSlow(i.id))?' <span class="slow">遅</span>':''}</div></div>`}
+    h+=`</div></div>`;
+  }else{
+    h+=`<div class="card">`;
+    for(const q of QS){const ch=q.q.split('-')[0];if(ch!==lastCh){if(lastCh)h+=`</div>`;lastCh=ch;h+=`<div class="ch">${ch}　${esc(q.ch)}</div><div class="grid sec">`}
+      h+=`<div class="qhead">${q.q}　${esc(q.qt)}</div>`;
+      for(const i of q.items){const st=itemStatus(i.id),t=toneStyle(st);
+        h+=`<div class="tile ${t.dark?'dark':''}" style="${t.style};min-height:78px" onclick="openQ('${q.q}','${i.id}')">${p.has(i.id)?'<span class="dot"></span>':''}
+         <div class="no" style="font-size:13px">〔${i.no}〕 ${stars(i.stars)}</div><div class="tt">${esc(i.title)}</div>
+         <div class="meta">${st?`${pct(st.acc)}・${st.days?st.days+'日前':'今日'}`:'未実施'}${isSlow(i.id)?' <span class="slow">遅</span>':''}</div></div>`}}
+    h+=`</div></div>`;
+  }
+  return h;
+}
+function openQ(qid,focus){const q=QS.find(x=>x.q===qid),p=new Set(planOf());
+  let h=`<div class="row"><h2 class="grow" style="margin:0">問題 ${q.q}　${esc(q.qt)}</h2><button class="b s" onclick="closeSheet()">閉じる</button></div>
+  <div class="row" style="margin:10px 0"><button class="b p" onclick="closeSheet();startQueue(${esc(JSON.stringify(q.items.map(i=>i.id)))})">この問題を通しで練習</button>
+  <button class="b" onclick="addPlan(${esc(JSON.stringify(q.items.map(i=>i.id)))});openQ('${qid}')">全セクションを今日に追加</button></div>
+  <table><tr><th></th><th>セクション</th><th class="n">最新</th><th class="n hide-sm">実施日</th><th class="n hide-sm">次回</th><th></th></tr>`;
+  for(const i of q.items){const st=itemStatus(i.id),t=toneStyle(st),s=srsOf(i.id),n=attemptsOf(i.id).length;
+    h+=`<tr style="${focus===i.id?'background:var(--brands)':''}"><td><span class="sw" style="${t.style}"></span></td>
+    <td>〔${i.no}〕 ${esc(i.title)} ${stars(i.stars)}${kinkiFor(i.id).some(k=>k.scope!=='g')?' <span class="pill ng">禁忌あり</span>':''}<div class="sub">${n?`${n}回練習`:'未実施'}</div></td>
+    <td class="n">${st?`<span class="${st.pass?'ok':'ng'}">${pct(st.acc)}</span>`:'–'}</td><td class="n hide-sm sub">${st?st.date.slice(5):''}</td><td class="n hide-sm sub">${s?s.due.slice(5):''}</td>
+    <td class="n"><button class="b s p" onclick="closeSheet();startQueue(['${i.id}'])">練習</button>
+    <button class="b s" onclick="togglePlan('${i.id}');openQ('${qid}','${focus||''}')">${p.has(i.id)?'予定から外す':'今日に追加'}</button></td></tr>`}
+  h+=`</table>`;
+  document.getElementById('sheetIn').innerHTML=h;document.getElementById('sheet').classList.add('on')}
+function closeSheet(){document.getElementById('sheet').classList.remove('on');if(!run)draw(1)}
+function togglePlan(id){const p=planOf();setPlan(p.includes(id)?p.filter(x=>x!==id):[...p,id])}
+function addPlan(ids){setPlan([...planOf(),...ids])}
+
+/* ---------- 今日 ---------- */
+function itemLabel(it){return `<b>${it.q}〔${it.no}〕</b> ${esc(it.title)}<div class="sub">${esc(it.qt)}</div>`}
+function vToday(){
+  const t=TODAY(),p=planOf(t).filter(id=>BYID[id]),todayA=Object.values(ATT).flat().filter(a=>a.date===t);
+  const done=p.filter(id=>bestOn(id,t)).length,okc=p.filter(id=>{const b=bestOn(id,t);return b&&b.pass}).length;
+  const avg=todayA.length?todayA.reduce((s,a)=>s+a.acc,0)/todayA.length:null,due=dueList().filter(id=>!p.includes(id));
+  let h=`<div class="card"><div class="stats"><div class="stat"><span class="sub">今日の予定</span><b>${p.length}</b></div>
+   <div class="stat"><span class="sub">練習済み</span><b>${done}/${p.length}</b></div><div class="stat"><span class="sub">合格（緑）</span><b>${okc}</b></div>
+   <div class="stat"><span class="sub">今日の平均精度</span><b>${pct(avg)}</b></div>
+   <div class="stat"><span class="sub">今日の学習時間</span><b>${fmtMin(todayA.reduce((s,a)=>s+(a.sec||0),0)/60)}</b></div>
+   <div class="stat"><span class="sub">予定の見込み／使える時間</span><b>${fmtMin(p.filter(id=>!bestOn(id,t)).reduce((s,id)=>s+estFor(id),0))}<span class="sub"> / ${fmtMin(budgetOf(t))}</span></b></div></div>
+   ${S.schedule&&S.schedule.days.find(d=>d.date===t)&&S.schedule.days.find(d=>d.date===t).note?`<p class="sub" style="margin:10px 0 0">スケジュールのメモ：${esc(S.schedule.days.find(d=>d.date===t).note)}</p>`:''}</div>
+   <div class="card"><div class="row"><h2 class="grow">今日やる理論</h2>${p.length?`<button class="b p" onclick="startQueue(${esc(JSON.stringify(p.filter(id=>!bestOn(id,t)).length?p.filter(id=>!bestOn(id,t)):p))})">${p.some(id=>!bestOn(id,t))?'未練習を順に始める':'もう一周する'}</button>`:''}
+   <button class="b" onclick="go('map')">マップから追加</button></div>`;
+  if(!p.length)h+=`<div class="empty">今日の暗記がまだ指定されていません。<br>マップのブロックをタップして「今日に追加」するか、下の復習候補から追加してください。</div>`;
+  else{const kd=kindMap(t);h+=`<table><tr><th></th><th>理論</th><th class="n hide-sm">見込み</th><th class="n">今日の最高</th><th class="n hide-sm">前回</th><th></th></tr>`;
+    p.forEach((id,i)=>{const it=BYID[id],b=bestOn(id,t),prev=attemptsOf(id).filter(a=>a.date<t).pop(),tn=toneStyle(itemStatus(id));
+      h+=`<tr><td><span class="sw" style="${tn.style}"></span></td><td>${kd[id]?kindTag(kd[id]):''}${itemLabel(it)} ${stars(it.stars)}</td><td class="n hide-sm sub">${fmtMin(estFor(id))}</td><td class="n">${b?`<span class="${b.pass?'ok':'ng'}">${pct(b.acc)}</span> <span class="sub">${b.sec?fmtSec(b.sec):""}</span>`:'<span class="sub">未</span>'}</td>
+      <td class="n hide-sm">${prev?pct(prev.acc):'–'}</td><td class="n"><button class="b s p" onclick="startQueue(['${id}'])">練習</button>
+      <button class="b s" onclick="mvPlan(${i},-1)" ${i?'':'disabled'}>↑</button><button class="b s" onclick="togglePlan('${id}');draw(1)">外す</button></td></tr>`});h+=`</table>`}
+  h+=`</div><div class="card"><div class="row"><h2 class="grow">復習候補（復習日が来た理論）</h2>${due.length?`<button class="b s" onclick="addPlan(dueList());draw(1)">すべて追加</button>`:''}</div>
+   <p class="sub" style="margin-top:0">合格するごとに次の復習までの間隔が 1→3→7→14→30→60日 と延び、不合格なら翌日に戻ります。正確でも時間がかかった（<span class="slow">遅</span>）場合は間隔を伸ばしません。正確かつ速い場合は一段飛ばします。</p>`;
+  if(!due.length)h+=`<div class="empty">復習日が来ている理論はありません。</div>`;
+  else{h+=`<table>`;due.forEach(id=>{const it=BYID[id],l=lastOf(id),tn=toneStyle(itemStatus(id));
+    h+=`<tr><td><span class="sw" style="${tn.style}"></span></td><td>${itemLabel(it)}</td><td class="n">前回 ${pct(l.acc)}</td><td class="n"><button class="b s" onclick="addPlan(['${id}']);draw(1)">追加</button></td></tr>`});h+=`</table>`}
+  return h+`</div>`;
+}
+function mvPlan(i,d){const p=planOf();[p[i],p[i+d]]=[p[i+d],p[i]];setPlan(p);draw(1)}
+
+/* ---------- 時間計測 ----------
+   入力画面が表示されていて、アプリが前面にあり、最後の入力から90秒以内の時間だけを数える
+   （放置・他アプリへの切替・正解テキスト編集の時間は含めない） */
+const IDLE_MS=90000;
+const TM={ms:0,last:0,lastInput:0,on:false,iv:null};
+function tick(){const t=performance.now();if(TM.on&&document.visibilityState==='visible'){const until=Math.min(t,TM.lastInput+IDLE_MS);if(until>TM.last)TM.ms+=until-TM.last}TM.last=t;paintTimer()}
+function timerSync(){const inp=run&&!run.graded&&!run.edit&&run.i<blocksOf(run.id).length;
+  if(inp&&!TM.on){TM.on=true;TM.last=TM.lastInput=performance.now()}else if(!inp&&TM.on){tick();TM.on=false}
+  if(!TM.iv)TM.iv=setInterval(tick,1000);paintTimer()}
+function touch(){TM.lastInput=performance.now()}
+function paintTimer(){const el=document.getElementById('tmr');if(!el||!run)return;const b=blocksOf(run.id)[run.i];if(!b)return;
+  const goal=norm(b.t).length/S.settings.targetSpeed*60,idle=TM.on&&performance.now()-TM.lastInput>IDLE_MS;
+  el.innerHTML=`経過 ${fmtSec(TM.ms/1000)}<span class="sub" style="font-weight:400">　目安 ${fmtSec(goal)}${idle?'　（入力がないため一時停止中）':''}</span>`;el.className='timer'+(TM.ms/1000>goal?' over':'')}
+document.addEventListener('visibilitychange',()=>{tick()});
+
+/* ---------- 練習 ---------- */
+function startQueue(ids){if(!ids.length)return;TM.ms=0;TM.on=false;run={queue:ids,qi:0,id:ids[0],i:0,res:[],graded:null,hint:0,peek:false,draft:'',edit:false};draw()}
+function vRun(){
+  const it=BYID[run.id],B=blocksOf(run.id);if(run.i>=B.length)return vDone();
+  const b=B[run.i],g=run.graded,qtxt=run.queue.length>1?`<span class="pill">${run.qi+1} / ${run.queue.length} 理論目</span>`:'';
+  let h=`<div class="card"><div class="row"><div class="grow">${itemLabel(it)}</div>${qtxt}${stars(it.stars)}<button class="b s" onclick="go(tab)">中断</button></div>
+   <div class="prog">${B.map((_,k)=>`<span class="${k<run.res.length?(run.res[k].pass?'ok':'ng'):k===run.i?'cur':''}"></span>`).join('')}</div>
+   <div class="sub">区切り ${run.i+1} / ${B.length}${aiReady()?'　・AI判定オン':C.apiKey&&C.aiOn?'　・オフラインのためAI判定なし':''}</div>
+   <div class="prompt">${b.h?(S.settings.showHead?esc(b.h):esc(b.h[0])+' <span class="sub">（見出し非表示）</span>'):'（本文）'}</div>`;
+  if(run.edit){
+    return h+`<p class="sub">PDF抽出で崩れている箇所を修正できます（同期対象）。</p><input type="text" id="eh" value="${esc(b.h||'')}" placeholder="見出し（空欄可）" style="margin-bottom:6px">
+    <textarea id="et" style="min-height:260px">${esc(b.t)}</textarea><div class="row" style="margin-top:8px"><button class="b p" onclick="saveEdit()">保存</button><button class="b" onclick="run.edit=false;draw()">キャンセル</button>
+    <span class="grow"></span>${S.overrides[run.id]&&S.overrides[run.id].blocks?`<button class="b s" onclick="resetEdit()">元のテキストに戻す</button>`:''}</div></div>`}
+  if(!g){
+    const kk=kinkiFor(run.id).filter(k=>k.scope!=='g');
+    h+=`${kk.length?`<div class="kinki"><b>この理論の禁忌：</b>${kk.map(k=>esc(k.text)).join('／')}</div>`:''}
+    <div class="row" style="margin-bottom:6px"><span id="tmr" class="timer"></span></div>
+    <textarea id="ans" placeholder="覚えた内容を入力" oninput="run.draft=this.value;touch()" oncompositionupdate="touch()" onkeydown="touch();if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();grade()}">${esc(run.draft)}</textarea>
+    ${run.hint?`<div class="hint">ヒント：${esc(norm(b.t).slice(0,run.hint))}…</div>`:''}${run.peek?`<div class="answer" style="margin-top:8px">${esc(b.t)}</div>`:''}
+    <div class="row" style="margin-top:10px"><button class="b p" onclick="grade()">採点 <kbd>Ctrl/⌘+Enter</kbd></button><button class="b" onclick="run.hint+=10;draw()">ヒント</button>
+    <button class="b" onclick="run.peek=!run.peek;draw()">${run.peek?'正解を隠す':'正解を見る'}</button><span class="grow"></span><button class="b s" onclick="run.edit=true;draw()">正解テキストを編集</button></div>
+    ${run.hint||run.peek?`<p class="sub">ヒント／正解表示を使った区切りは不合格として記録されます。</p>`:''}`;
+  }else{
+    const pass=passOf(g);
+    h+=`<div class="row" style="margin:6px 0 8px"><span class="big ${pass?'ok':'ng'}">${pass?'○':'×'} ${pct(g.acc)}</span>
+     <span class="sub">文字の一致率　脱落 ${g.miss}字・余分 ${g.extra}字／正解 ${g.n}字<br>
+     所要時間 <b>${fmtSec(g.sec)}</b>（正しく書けた字で ${g.sec>0?Math.round(g.match/(g.sec/60)):'–'}字/分・目標 ${S.settings.targetSpeed}字/分）${g.sec>0&&g.acc>=S.settings.threshold&&g.match/(g.sec/60)<S.settings.targetSpeed*.75?' <span class="slow">遅</span>':''}</span><span class="grow"></span>
+     <button class="b s" onclick="g_flip()">${pass?'×にする':'○にする'}</button></div>
+     <div class="sub" style="margin-bottom:6px"><span style="background:var(--miss);padding:0 4px">赤＝書けなかった</span>　<span style="background:var(--extra);text-decoration:line-through;padding:0 4px">灰＝余分</span></div>
+     <div class="diff">${renderDiff(g.ops)}</div>${vAI(g)}
+     <details style="margin-top:8px"><summary>自分の解答</summary><div class="answer">${esc(g.input)}</div></details>
+     <div class="row" style="margin-top:12px"><button class="b p" id="nx" onclick="next()" ${g.aiState==='pending'?'disabled':''}>${run.i+1<B.length?'次の区切りへ':'この理論の結果を記録'} <kbd>Enter</kbd></button>
+     ${g.aiState==='pending'?`<button class="b" onclick="g_skipAI()">AI判定を待たずに進む</button>`:''}<button class="b" onclick="retry()">やり直す</button></div>`;
+  }
+  return h+`</div>`;
+}
+function vAI(g){
+  if(g.aiState==='off')return `<div class="ai sub">AI判定：${C.apiKey?'オフ（設定でオンにできます）':'未設定（設定画面でAPIキーを入力すると、意味・てにをは・禁忌事項も判定します）'}</div>`;
+  if(g.aiState==='pending')return `<div class="ai"><span class="spin"></span> AIが意味と禁忌事項を確認しています…</div>`;
+  if(g.aiState==='skip')return `<div class="ai sub">AI判定をスキップしました</div>`;
+  if(g.aiState==='error')return `<div class="ai"><span class="ng">AI判定エラー</span>：${esc(g.aiErr)} <button class="b s" onclick="runAI()">再試行</button></div>`;
+  const a=g.ai;let h=`<div class="ai"><h4>AI判定：${a.meaning_ok?'<span class="ok">意味は通っている</span>':'<span class="ng">意味が変わっている／不成立</span>'}　<span class="sub">意味の再現度 ${a.meaning_score}%</span></h4>`;
+  if(a.kinki_violations.length)h+=a.kinki_violations.map(k=>`<div class="kinki"><b>禁忌違反：</b>${esc(k.rule)}<br><span class="sub">解答「${esc(k.written)}」— ${esc(k.reason)}</span></div>`).join('');
+  if(a.critical_errors.length)h+=`<b style="font-size:13px">意味が変わる誤り</b><ul>${a.critical_errors.map((e,k)=>`<li>正「${esc(e.correct)}」→ 誤「${esc(e.written)}」<br><span class="sub">${esc(e.reason)}</span>
+    <div class="row" style="margin-top:3px"><button class="b s" onclick="regKinki(${k},'item')">この理論の禁忌に登録</button><button class="b s" onclick="regKinki(${k},'g')">全体の禁忌に登録</button></div></li>`).join('')}</ul>`;
+  if(a.omissions.length)h+=`<b style="font-size:13px">主な脱落</b><ul>${a.omissions.map(o=>`<li>${esc(o)}</li>`).join('')}</ul>`;
+  if(a.comment)h+=`<div class="sub">講評：${esc(a.comment)}</div>`;
+  return h+`</div>`;
+}
+function passOf(g){if(g.manual!=null)return g.manual;if(g.helped)return false;if(g.acc<S.settings.threshold)return false;
+  if(g.ai&&(!g.ai.meaning_ok||g.ai.kinki_violations.length))return false;return true}
+function grade(){const b=blocksOf(run.id)[run.i],input=run.draft||'';tick();TM.on=false;
+  const d=diff(norm(b.t),norm(input));run.graded={...d,input,sec:TM.ms/1000,helped:run.hint>0||run.peek,ai:null,aiState:aiReady()?'pending':'off',manual:null};
+  draw();if(run.graded.aiState==='pending')runAI();else focusNext()}
+function focusNext(){setTimeout(()=>{const n=document.getElementById('nx');n&&n.focus({preventScroll:true})},0)}
+function runAI(){const g=run.graded,it=BYID[run.id],b=blocksOf(run.id)[run.i];g.aiState='pending';draw(1);
+  callAI(it,b,g.input).then(a=>{if(run&&run.graded===g){g.ai=a;g.aiState='done';draw(1);focusNext()}})
+   .catch(e=>{if(run&&run.graded===g){g.aiState='error';g.aiErr=e.message;draw(1)}})}
+function g_skipAI(){run.graded.aiState='skip';draw(1);focusNext()}
+function g_flip(){const g=run.graded;g.manual=!passOf(g);draw(1)}
+function retry(){run.draft=run.graded.input;run.graded=null;draw()}
+function regKinki(k,scope){const e=run.graded.ai.critical_errors[k];
+  const txt=prompt('禁忌事項として登録する内容（編集できます）',`「${e.correct}」を「${e.written}」と書かない（${e.reason}）`);if(!txt)return;
+  S.kinki[uid()]={scope:scope==='g'?'g':run.id,text:txt.trim(),u:now()};saveState();toast('禁忌事項に登録しました')}
+function next(){const g=run.graded;if(!g||g.aiState==='pending')return;
+  run.res.push({acc:Math.round(g.acc*10)/10,pass:passOf(g),n:g.n,m:g.match,sec:Math.round(g.sec),helped:g.helped,
+    ai:g.ai?{ok:g.ai.meaning_ok,score:g.ai.meaning_score,crit:g.ai.critical_errors.length,kinki:g.ai.kinki_violations.map(k=>k.rule)}:null});
+  run.i++;run.graded=null;run.hint=0;run.peek=false;run.draft='';TM.ms=0;TM.on=false;if(run.i>=blocksOf(run.id).length)record();draw()}
+function record(){const tot=run.res.reduce((s,r)=>s+r.n,0)||1,acc=run.res.reduce((s,r)=>s+r.acc*r.n,0)/tot,pass=run.res.every(r=>r.pass),t=TODAY(),u=uid();
+  const sec=run.res.reduce((s,r)=>s+(r.sec||0),0);
+  S.attempts[u]={uid:u,ts:now(),date:t,id:run.id,acc:Math.round(acc*10)/10,pass,sec,dev:C.device||'',blocks:run.res};
+  if(!planOf(t).includes(run.id))S.plan[t]={ids:[...planOf(t),run.id],u:now()};saveState();
+  const a=S.attempts[u],sr=srsOf(run.id);run.summary={acc,pass,due:sr.due,sec,speed:speedOf(a),q:quality(a),iv:sr.iv}}
+function vDone(){const it=BYID[run.id],s=run.summary,more=run.qi+1<run.queue.length;
+  const nextToday=planOf().find(id=>id!==run.id&&!bestOn(id,TODAY()));
+  const QMSG={fail:'正確さが足りないため、明日もう一度練習します。',slow:'正確に書けましたが時間がかかっています。まだ思い出すのに苦労している段階なので、復習の間隔は伸ばしません。',good:'正確に、十分な速さで書けました。復習の間隔を伸ばします。',great:'正確かつ速く書けています。復習の間隔を大きく伸ばします。'};
+  return `<div class="card">${itemLabel(it)}<div class="row" style="margin:14px 0"><span class="big ${s.pass?'ok':'ng'}">${s.pass?'○ 合格':'× 要復習'}</span><span class="big">${pct(s.acc)}</span>
+   <span class="big" style="font-size:22px">${fmtSec(s.sec)}</span><span class="sub">${s.speed?Math.round(s.speed)+'字/分':''}${s.q==='slow'?' <span class="slow">遅</span>':''}</span></div>
+  <p style="margin:0 0 8px">${QMSG[s.q]}</p>
+  <table>${run.res.map((r,k)=>`<tr><td>区切り${k+1} ${esc(blocksOf(run.id)[k].h||'')}</td><td class="n">${pct(r.acc)}</td><td class="n sub">${fmtSec(r.sec)}</td><td>${r.pass?'<span class="ok">○</span>':'<span class="ng">×</span>'}
+   ${r.ai?(r.ai.ok?'<span class="pill">意味OK</span>':'<span class="pill ng">意味NG</span>'):''}${r.ai&&r.ai.kinki.length?' <span class="pill ng">禁忌違反</span>':''}${r.helped?' <span class="pill w">ヒント使用</span>':''}</td></tr>`).join('')}</table>
+  <p class="sub">次回の復習日：${s.due}（${s.iv}日後）</p><div class="row">
+  ${more?`<button class="b p" id="nx" onclick="nextInQueue()">次の理論へ（${run.queue[run.qi+1]}） <kbd>Enter</kbd></button>`:nextToday?`<button class="b p" onclick="startQueue(['${nextToday}'])">今日の次の理論へ（${nextToday}）</button>`:''}
+  <button class="b" onclick="startQueue(['${run.id}'])">もう一度</button><button class="b" onclick="run=null;draw()">戻る</button></div></div>`}
+function nextInQueue(){const q=run.queue,qi=run.qi+1;TM.ms=0;TM.on=false;run={queue:q,qi,id:q[qi],i:0,res:[],graded:null,hint:0,peek:false,draft:'',edit:false};draw()}
+function saveEdit(){const B=structuredClone(blocksOf(run.id));B[run.i]={h:document.getElementById('eh').value.trim()||null,t:document.getElementById('et').value};
+  S.overrides[run.id]={blocks:B,u:now()};saveState();run.edit=false;draw()}
+function resetEdit(){if(!confirm('この理論の編集を取り消しますか？'))return;S.overrides[run.id]={blocks:null,u:now()};saveState();run.edit=false;draw()}
+document.addEventListener('keydown',e=>{if(!run||e.key!=='Enter'||e.ctrlKey||e.metaKey||e.isComposing)return;const a=document.activeElement;
+  if(a&&(a.tagName==='TEXTAREA'||a.tagName==='INPUT'||a.id==='nx'))return;
+  if(run.graded&&run.graded.aiState!=='pending'){e.preventDefault();next()}else if(run.summary&&run.i>=blocksOf(run.id).length&&run.qi+1<run.queue.length){e.preventDefault();nextInQueue()}});
+
+/* =========================================================
+   スケジュール（AI／自動）
+   ========================================================= */
+const KIND={new:['新規','k-new'],review:['復習','k-review'],fix:['やり直し','k-fix'],speed:['スピード','k-speed']};
+const kindTag=k=>KIND[k]?`<span class="kind ${KIND[k][1]}">${KIND[k][0]}</span>`:'';
+function budgetOf(d){const w=new Date(d+'T00:00:00').getDay();return (w===0||w===6)?S.settings.minWeekend:S.settings.minWeekday}
+function kindMap(d){const day=S.schedule&&S.schedule.days.find(x=>x.date===d);const m={};if(day)day.items.forEach(i=>m[i.id]=i.kind);return m}
+function kindNow(id){const l=lastOf(id);if(!l)return 'new';if(!l.pass)return 'fix';if(speedClass(l)==='slow')return 'speed';return 'review'}
+function overview(){const t=TODAY(),un=ITEMS.filter(i=>!attemptsOf(i.id).length);
+  const exam=S.settings.examDate,left=exam?daysBetween(t,exam):null;
+  const needMin=un.reduce((s,i)=>s+estNew(i.id),0);
+  let avail=null;if(left!=null&&left>0){avail=0;for(let k=0;k<left;k++)avail+=budgetOf(addDays(t,k))}
+  return {un:un.length,un2:un.filter(i=>i.stars>=2).length,left,needMin,avail,
+    red:ITEMS.filter(i=>{const l=lastOf(i.id);return l&&!l.pass}).length,slow:ITEMS.filter(i=>isSlow(i.id)).length,
+    green:ITEMS.filter(i=>{const l=lastOf(i.id);return l&&l.pass&&!isSlow(i.id)}).length,due:dueList().length}}
+/* AIなしの自動作成：復習日が来たもの（やり直し→スピード→復習）を優先し、残り時間の6割までで新規を進める */
+function localPlan(){const st=S.settings,days=[],t=TODAY(),H=st.horizon;
+  const sim={};ITEMS.forEach(i=>{const s=srsOf(i.id);sim[i.id]=s?{due:s.due,idx:STEPS.indexOf(s.iv),kind:kindNow(i.id)}:null});
+  const order=[...ITEMS.filter(i=>i.stars>=2),...ITEMS.filter(i=>i.stars<2)].map(i=>i.id);
+  const rank={fix:0,speed:1,review:2};
+  for(let k=0;k<H;k++){const d=addDays(t,k),bud=budgetOf(d);let used=0;const items=[];
+    if(bud>0){
+      const due=Object.entries(sim).filter(([id,s])=>s&&s.due<=d).sort((a,b)=>rank[a[1].kind]-rank[b[1].kind]||a[1].due.localeCompare(b[1].due)||BYID[b[0]].stars-BYID[a[0]].stars);
+      for(const [id,s] of due){const m=estPractice(id);if(used+m>bud*1.05)continue;items.push({id,kind:s.kind,min:Math.round(m)});used+=m;
+        s.idx=Math.min((s.kind==='fix'?0:s.idx)+1,STEPS.length-1);s.due=addDays(d,STEPS[s.idx]);s.kind='review'}
+      let nu=0;
+      for(const id of order){if(sim[id])continue;const m=estNew(id);
+        if((used+m>bud*1.05&&items.length)||(nu+m>bud*0.7&&nu>0))break;
+        items.push({id,kind:'new',min:Math.round(m)});used+=m;nu+=m;sim[id]={due:addDays(d,1),idx:0,kind:'review'}}
+    }
+    days.push({date:d,items,note:''})}
+  return {by:'auto',created:now(),strategy:'復習日が来た理論（不合格→正確だが遅い理論→通常の復習）を優先し、残り時間の7割までで★★から教科書順に新しい理論を進める自動計画です。',milestones:[],days}}
+const PLAN_SYS=`あなたは税理士試験「消費税法」の理論暗記を指導する学習計画の専門家です。受験生の学習記録（精度と所要時間）と条件から、日別の暗記スケジュールを作ります。
+
+計画の原則:
+1. 暗記の質は「正確さ」と「速さ（思い出す時間）」の両方で評価する。精度が高くても時間がかかっている理論（速度判定=遅）は、まだ定着していないものとして扱い、2〜3日以内に「speed」として再練習を入れる。
+2. 不合格（精度不足・意味の誤り・禁忌違反）の理論は「fix」として翌日〜2日以内に入れる。
+3. 復習日（次回期限）が来た理論は「review」として期限どおりに入れる。期限より大幅に早い復習は入れない。
+4. 残りの時間で未学習の理論を「new」として進める。★★を優先し、同じ問題番号（例：2-1の〔1〕〔2〕…）はなるべく同じ日か連続した日にまとめ、教科書順を基本とする。新規を入れた翌日・数日後には必ず復習が発生することを見越して、新規の量を調整する。
+5. 試験日が与えられている場合、試験日までに全理論を一巡し、その後に反復できるよう逆算する。間に合わない場合は★★を優先し、その旨を strategy に書く。
+6. 各日の合計見込み時間（min の合計）は、その日の使える時間を超えない（最大+10%）。使える時間が0分の日は空にする。
+7. min には与えられた見込み時間（新規なら「新規見込み」、それ以外は「練習見込み」）を基本として使う。
+
+出力は次のJSONオブジェクトのみ（前後に文章やコードフェンスを付けない）:
+{"strategy":"全体方針（250字以内）","milestones":["節目となる目標（例：11月末までに★★を一巡）"],"days":[{"date":"YYYY-MM-DD","items":[{"id":"理論ID","kind":"new|review|fix|speed","min":整数}],"note":"その日の狙い（40字以内）"}]}`;
+async function aiPlan(){const st=S.settings,t=TODAY(),o=overview(),sp=mySpeed();
+  const dayLines=[];for(let k=0;k<st.horizon;k++){const d=addDays(t,k);dayLines.push(`${d}（${'日月火水木金土'[new Date(d+'T00:00:00').getDay()]}）${budgetOf(d)}分`)}
+  const rows=ITEMS.map(i=>{const A=attemptsOf(i.id),l=A[A.length-1],s=srsOf(i.id),v=l?speedOf(l):null;
+    return [i.id,'★'.repeat(i.stars)||'-',(i.qt+'／'+i.title).slice(0,24),charsOf(i.id),A.length,l?Math.round(l.acc):'',l?(l.pass?'合格':'不合格'):'',l?l.date:'',v?Math.round(v):'',l?({slow:'遅',mid:'やや遅',fast:'速',na:'-'}[speedClass(l)]):'',s?s.due:'',Math.round(estPractice(i.id)),Math.round(estNew(i.id))].join('|')});
+  const user=`今日: ${t}
+試験日: ${st.examDate||'未設定'}${o.left!=null?`（あと${o.left}日）`:''}
+計画期間と各日の使える時間:
+${dayLines.join('\n')}
+目標速度: ${st.targetSpeed}字/分　この受験生の実測中央値: ${Math.round(sp)}字/分
+現状: 未学習${o.un}件（うち★★${o.un2}件）、不合格${o.red}件、遅い${o.slow}件、定着${o.green}件、期限到来${o.due}件
+
+理論一覧（列: ID|重要度|問題／セクション|字数|練習回数|最新精度|最新判定|最終実施日|最新速度(字/分)|速度判定|次回期限|練習見込み(分)|新規見込み(分)）
+${rows.join('\n')}`;
+  const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':C.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:C.model,max_tokens:16000,system:PLAN_SYS,messages:[{role:'user',content:user}]})});
+  if(!r.ok){let m='';try{m=(await r.json()).error.message}catch(e){}throw new Error('API '+r.status+(m?': '+m:''))}
+  const j=await r.json(),txt=(j.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('');
+  const s=txt.indexOf('{'),e=txt.lastIndexOf('}');if(s<0)throw new Error('AIの応答を解釈できませんでした');
+  const o2=JSON.parse(txt.slice(s,e+1));
+  const days=(o2.days||[]).filter(d=>/^\d{4}-\d\d-\d\d$/.test(d.date)&&d.date>=t).map(d=>({date:d.date,note:String(d.note||'').slice(0,80),
+    items:(d.items||[]).filter(x=>BYID[x.id]).map(x=>({id:x.id,kind:KIND[x.kind]?x.kind:kindNow(x.id),min:Math.round(+x.min||estFor(x.id))}))}));
+  if(!days.length)throw new Error('AIの計画が空でした');
+  return {by:'ai',model:C.model,created:now(),strategy:String(o2.strategy||''),milestones:(o2.milestones||[]).map(String),days}}
+function applySchedule(sc){const t=TODAY();sc.u=now();S.schedule=sc;
+  for(const d of sc.days){let ids=d.items.map(i=>i.id);if(d.date===t)ids=[...new Set([...planOf(t).filter(id=>bestOn(id,t)),...ids])];S.plan[d.date]={ids,u:now()}}
+  saveState()}
+let planBusy=false;
+async function makePlan(useAI){if(planBusy)return;
+  if(useAI&&!aiReady()){toast(C.apiKey?'オフラインのためAIを使えません':'設定画面でAPIキーを入力してください');return}
+  if(S.schedule&&!confirm('今のスケジュールを作り直します（今日以降の予定が置き換わります）。よろしいですか？'))return;
+  planBusy=true;draw(1);
+  try{const sc=useAI?await aiPlan():localPlan();applySchedule(sc);toast('スケジュールを作成しました')}
+  catch(e){toast('作成できませんでした: '+e.message)}finally{planBusy=false;draw(1)}}
+function setPS(k,v){S.settings[k]=v;S.settings.u=now();saveState();draw(1)}
+function vPlan(){const st=S.settings,o=overview(),t=TODAY(),sc=S.schedule;
+  const stale=sc&&(!sc.days.some(d=>d.date>=t)||(now()-sc.created)>7*864e5);
+  let h=`<div class="card"><h2>スケジュールの条件</h2><div class="row" style="align-items:flex-end">
+   <div class="field"><label>試験日</label><input type="date" value="${esc(st.examDate)}" onchange="setPS('examDate',this.value)"></div>
+   <div class="field"><label>平日の暗記時間（分）</label><input type="number" min="0" step="10" value="${st.minWeekday}" style="width:100px" onchange="setPS('minWeekday',+this.value)"></div>
+   <div class="field"><label>土日の暗記時間（分）</label><input type="number" min="0" step="10" value="${st.minWeekend}" style="width:100px" onchange="setPS('minWeekend',+this.value)"></div>
+   <div class="field"><label>計画期間</label><select onchange="setPS('horizon',+this.value)">${[7,14,21].map(n=>`<option value="${n}" ${st.horizon===n?'selected':''}>${n}日</option>`).join('')}</select></div>
+   <div class="field"><label>目標速度（字/分）</label><input type="number" min="5" max="200" value="${st.targetSpeed}" style="width:90px" onchange="setPS('targetSpeed',+this.value)"></div></div>
+   <div class="row"><button class="b p" onclick="makePlan(true)" ${planBusy?'disabled':''}>${planBusy?'<span class="spin"></span> AIが計画中…（1分ほどかかります）':'AIでスケジュールを作る'}</button>
+   <button class="b" onclick="makePlan(false)" ${planBusy?'disabled':''}>AIなしで自動作成</button></div>
+   <p class="sub" style="margin-bottom:0">AIには各理論の精度・所要時間（字/分）・最終実施日・次回期限・字数を渡します（理論の本文は送りません）。正確でも時間がかかっている理論は「スピード」として短い間隔で練習が入ります。</p></div>
+  <div class="card"><h2>現状</h2><div class="stats">
+   <div class="stat"><span class="sub">試験まで</span><b>${o.left!=null?o.left+'日':'–'}</b></div>
+   <div class="stat"><span class="sub">未学習</span><b>${o.un}<span class="sub"> 件（★★${o.un2}）</span></b></div>
+   <div class="stat"><span class="sub">定着（緑・速い）</span><b>${o.green}</b></div>
+   <div class="stat"><span class="sub">正確だが遅い</span><b>${o.slow}</b></div>
+   <div class="stat"><span class="sub">不合格（赤）</span><b>${o.red}</b></div>
+   <div class="stat"><span class="sub">あなたの速度（中央値）</span><b>${Math.round(mySpeed())}<span class="sub"> 字/分</span></b></div></div>
+   <p class="sub" style="margin-bottom:0">未学習をすべて覚える見込み時間：約${fmtMin(o.needMin)}${o.avail!=null?`／試験日までに使える時間：約${fmtMin(o.avail)}${o.needMin>o.avail*.6?' <span class="ng">（新規だけで使える時間の6割超。時間を増やすか★★を優先してください）</span>':''}`:''}</p></div>`;
+  if(!sc)return h+`<div class="card empty">まだスケジュールがありません。条件を入れて「AIでスケジュールを作る」を押してください。</div>`;
+  h+=`<div class="card">${stale?`<div class="kinki" style="margin-top:0">作成から日が経っています。記録を反映するため作り直しをおすすめします。</div>`:''}
+   <div class="row"><h2 class="grow" style="margin:0">${sc.by==='ai'?'AIのスケジュール':'自動スケジュール'}</h2><span class="sub">${new Date(sc.created).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})} 作成</span></div>
+   ${sc.strategy?`<p>${esc(sc.strategy)}</p>`:''}${sc.milestones&&sc.milestones.length?`<ul>${sc.milestones.map(m=>`<li>${esc(m)}</li>`).join('')}</ul>`:''}
+   <div class="legend" style="margin-bottom:10px">${Object.keys(KIND).map(k=>kindTag(k)).join('')}<span>新規＝初めて覚える／復習＝期限どおり／やり直し＝前回不合格／スピード＝正確だが遅い</span></div>`;
+  for(const d of sc.days.filter(d=>d.date>=t)){const tot=d.items.reduce((s,i)=>s+i.min,0),bud=budgetOf(d.date),isT=d.date===t;
+    const done=d.items.filter(i=>bestOn(i.id,d.date)).length;
+    h+=`<div class="day ${isT?'today':''}"><div class="row"><b>${d.date.slice(5).replace('-','/')}（${'日月火水木金土'[new Date(d.date+'T00:00:00').getDay()]}）${isT?' 今日':''}</b>
+      <span class="sub">${fmtMin(tot)} / ${fmtMin(bud)}</span>${isT&&d.items.length?`<span class="sub">${done}/${d.items.length} 完了</span>`:''}<span class="grow"></span>${isT?`<button class="b s p" onclick="go('today')">今日の暗記へ</button>`:''}</div>
+      <div class="bar" style="margin:6px 0"><i style="width:${bud?Math.min(100,100*tot/bud):0}%"></i></div>
+      ${d.note?`<div class="sub">${esc(d.note)}</div>`:''}
+      <div style="margin-top:4px;font-size:13px;line-height:1.9">${d.items.length?d.items.map(i=>{const it=BYID[i.id];return `<span style="white-space:nowrap;margin-right:10px">${kindTag(i.kind)}${it.q}〔${it.no}〕${esc(it.title.slice(0,14))} <span class="sub">${i.min}分</span>${bestOn(i.id,d.date)?' <span class="ok">✓</span>':''}</span>`}).join(''):'<span class="sub">休み</span>'}</div></div>`}
+  return h+`</div>`}
+
+/* ---------- 記録 ---------- */
+function vLog(){const all=Object.values(ATT).flat().sort((a,b)=>a.ts-b.ts),days={};all.forEach(a=>{(days[a.date]=days[a.date]||[]).push(a)});
+  const ds=Object.keys(days).sort(),learned=Object.keys(ATT).filter(id=>BYID[id]).length,green=ITEMS.filter(i=>{const l=lastOf(i.id);return l&&l.pass}).length;
+  let h=`<div class="card"><div class="stats"><div class="stat"><span class="sub">練習回数</span><b>${all.length}</b></div><div class="stat"><span class="sub">学習した理論</span><b>${learned}/${ITEMS.length}</b></div>
+   <div class="stat"><span class="sub">現在 緑の理論</span><b>${green}</b></div><div class="stat"><span class="sub">学習日数</span><b>${ds.length}</b></div><div class="stat"><span class="sub">総学習時間</span><b>${fmtMin(all.reduce((s,a)=>s+(a.sec||0),0)/60)}</b></div><div class="stat"><span class="sub">速度（中央値）</span><b>${Math.round(mySpeed())}<span class="sub"> 字/分</span></b></div></div></div>`;
+  const last=[];for(let k=29;k>=0;k--){const d=addDays(TODAY(),-k),A=days[d]||[];last.push({d,n:A.length,avg:A.length?A.reduce((s,a)=>s+a.acc,0)/A.length:null})}
+  const W=900,H=170,bw=W/30;let svg=`<svg viewBox="0 0 ${W} ${H+24}" style="width:100%;height:auto">`;
+  [0,50,100].forEach(v=>{const y=H-v/100*H;svg+=`<line x1="0" x2="${W}" y1="${y}" y2="${y}" stroke="#e2e0da"/><text x="2" y="${y-3}" font-size="11" fill="#646b73">${v}%</text>`});
+  last.forEach((x,k)=>{if(x.avg!=null){const hh=Math.max(2,x.avg/100*H);svg+=`<rect x="${k*bw+4}" y="${H-hh}" width="${bw-8}" height="${hh}" rx="3" fill="rgb(${x.avg>=S.settings.threshold?'47,143,91':'200,71,58'})"><title>${x.d} 平均${Math.round(x.avg)}%（${x.n}回）</title></rect>`}
+    if(k%5===4||k===29)svg+=`<text x="${k*bw+bw/2}" y="${H+16}" font-size="11" fill="#646b73" text-anchor="middle">${x.d.slice(5)}</text>`});svg+=`</svg>`;
+  h+=`<div class="card"><h2>直近30日の平均精度</h2>${svg}</div><div class="card"><h2>日別</h2>`;
+  if(!ds.length)h+=`<div class="empty">まだ記録がありません</div>`;else{h+=`<table><tr><th>日付</th><th class="n">回数</th><th class="n">理論数</th><th class="n">平均精度</th><th class="n">合格率</th><th class="n">学習時間</th></tr>`;
+    ds.slice().reverse().forEach(d=>{const A=days[d];h+=`<tr><td>${d}</td><td class="n">${A.length}</td><td class="n">${new Set(A.map(a=>a.id)).size}</td><td class="n">${pct(A.reduce((s,a)=>s+a.acc,0)/A.length)}</td><td class="n">${pct(100*A.filter(a=>a.pass).length/A.length)}</td><td class="n">${fmtMin(A.reduce((s,a)=>s+(a.sec||0),0)/60)}</td></tr>`});h+=`</table>`}
+  h+=`</div><div class="card"><h2>練習履歴</h2>`;
+  if(all.length){h+=`<table><tr><th>日時</th><th>理論</th><th class="n">精度</th><th class="n">時間</th><th class="n hide-sm">速度</th><th>判定</th><th></th></tr>`;
+    all.slice().reverse().slice(0,300).forEach(a=>{const it=BYID[a.id],t=new Date(a.ts),kin=a.blocks&&a.blocks.some(b=>b.ai&&b.ai.kinki&&b.ai.kinki.length);
+      h+=`<tr><td class="sub">${a.date.slice(5)} ${pad(t.getHours())}:${pad(t.getMinutes())}${a.dev?'<br>'+esc(a.dev):''}</td><td>${it?`${it.q}〔${it.no}〕 ${esc(it.title)}`:esc(a.id)}</td><td class="n">${pct(a.acc)}</td><td class="n">${a.sec?fmtSec(a.sec):'–'}</td><td class="n hide-sm">${speedOf(a)?Math.round(speedOf(a))+'字/分':'–'}${isSlowA(a)?' <span class="slow">遅</span>':''}</td>
+      <td>${a.pass?'<span class="ok">○</span>':'<span class="ng">×</span>'}${kin?' <span class="pill ng">禁忌</span>':''}</td><td class="n"><button class="b s" onclick="delA('${a.uid}')">削除</button></td></tr>`});h+=`</table>`}
+  else h+=`<div class="empty">まだ記録がありません</div>`;return h+`</div>`}
+function delA(u){if(!confirm('この記録を削除しますか？'))return;S.deleted[u]=1;delete S.attempts[u];saveState();draw(1)}
+
+/* ---------- 禁忌事項 ---------- */
+function vKinki(){const all=Object.entries(S.kinki).filter(([k,v])=>!v.del);const g=all.filter(([k,v])=>v.scope==='g'),it=all.filter(([k,v])=>v.scope!=='g').sort((a,b)=>a[1].scope.localeCompare(b[1].scope,undefined,{numeric:true}));
+  const row=([k,v])=>`<tr><td>${v.scope==='g'?'':`<b>${esc(v.scope)}</b> ${BYID[v.scope]?esc(BYID[v.scope].title):''}<br>`}${esc(v.text)}</td><td class="n"><button class="b s" onclick="editK('${k}')">編集</button><button class="b s danger" onclick="delK('${k}')">削除</button></td></tr>`;
+  return `<div class="card"><h2>禁忌事項とは</h2><p class="sub" style="margin:0">書き間違えると規定の意味が変わってしまう、絶対に避けたい誤りのリストです。AI判定がこのリストに照らして解答を確認し、違反があればその区切りは文字の一致率に関係なく不合格（赤）になります。AIが指摘した「意味が変わる誤り」から、ワンタップで登録することもできます。</p></div>
+  <div class="card"><div class="row"><h2 class="grow">全体の禁忌（すべての理論に適用）</h2><button class="b s p" onclick="addK('g')">＋ 追加</button></div><table>${g.map(row).join('')||'<tr><td class="empty">なし</td></tr>'}</table></div>
+  <div class="card"><div class="row"><h2 class="grow">理論ごとの禁忌</h2><button class="b s p" onclick="addK()">＋ 追加</button></div><table>${it.map(row).join('')||'<tr><td class="empty">まだありません</td></tr>'}</table></div>`}
+function addK(scope){if(!scope){scope=prompt('対象の理論番号（例：2-1-1 ＝ 問題2-1の〔1〕）');if(!scope)return;scope=scope.normalize('NFKC').trim().replace(/[〔〕\s]/g,'-').replace(/-+/g,'-').replace(/-$/,'');if(!BYID[scope]){alert('その理論番号が見つかりません');return}}
+  const t=prompt('禁忌事項の内容');if(!t)return;S.kinki[uid()]={scope,text:t.trim(),u:now()};saveState();draw(1)}
+function editK(k){const t=prompt('禁忌事項の内容',S.kinki[k].text);if(!t)return;S.kinki[k]={...S.kinki[k],text:t.trim(),u:now()};saveState();draw(1)}
+function delK(k){if(!confirm('削除しますか？'))return;S.kinki[k]={...S.kinki[k],del:1,u:now()};saveState();draw(1)}
+
+/* ---------- 設定 ---------- */
+function vSet(){const st=S.settings;
+  return `<div class="card"><h2>AI判定（Claude API）</h2>
+  <p class="sub" style="margin-top:0">文字の一致率に加えて、意味が通っているか・てにをは・禁忌事項をAIが判定します。APIキーはこの端末だけに保存され、同期されません（各端末で入力してください）。</p>
+  <div class="field"><label>APIキー（console.anthropic.com で発行）</label><input type="password" id="ak" value="${esc(C.apiKey)}" placeholder="sk-ant-..."></div>
+  <div class="row"><div class="field"><label>モデル</label><select id="am">${[['claude-sonnet-5-5','Sonnet 5.5（推奨・バランス）'],['claude-haiku-5-5','Haiku 5.5（安い・速い）'],['claude-opus-5-5','Opus 5.5（高精度）']].map(([v,l])=>`<option value="${v}" ${C.model===v?'selected':''}>${l}</option>`).join('')}</select></div>
+  <label style="margin-top:14px"><input type="checkbox" id="ao" ${C.aiOn?'checked':''}> AI判定を使う</label></div>
+  <div class="row"><button class="b p" onclick="saveAI()">保存</button><button class="b" onclick="testAI()">接続テスト</button><span id="aitest" class="sub"></span></div></div>
+
+  <div class="card"><h2>端末間の同期（GitHub 非公開リポジトリ）</h2>
+  <p class="sub" style="margin-top:0">記録・禁忌事項・テキスト修正・理論データを、あなた専用の非公開リポジトリ経由でiPadとWindowsの間で同期します。</p>
+  <div class="row"><div class="field grow"><label>GitHubユーザー名</label><input type="text" id="go" value="${esc(C.ghOwner)}" autocapitalize="off"></div>
+  <div class="field grow"><label>非公開リポジトリ名</label><input type="text" id="gr" value="${esc(C.ghRepo)}" placeholder="anki-data" autocapitalize="off"></div></div>
+  <div class="field"><label>アクセストークン（Fine-grained token：そのリポジトリの Contents を Read and write）</label><input type="password" id="gt" value="${esc(C.ghToken)}" placeholder="github_pat_..."></div>
+  <div class="field"><label>この端末の名前（履歴に表示）</label><input type="text" id="dv" value="${esc(C.device)}" placeholder="例：iPad / 自宅PC"></div>
+  <div class="row"><button class="b p" onclick="saveGH()">保存して同期</button><span class="sub">${syncState.err?'<span class="ng">'+esc(syncState.err)+'</span>':syncState.t?'最終同期 '+new Date(syncState.t).toLocaleString('ja-JP'):''}</span></div></div>
+
+  <div class="card"><h2>採点の設定</h2><table>
+  <tr><td>合格（緑）とする文字の一致率</td><td><input type="number" min="50" max="100" value="${st.threshold}" onchange="setS('threshold',+this.value)"> % 以上</td></tr>
+  <tr><td>番号記号（⑴①イ など）を無視</td><td><input type="checkbox" ${st.ignoreMarks?'checked':''} onchange="setS('ignoreMarks',this.checked)"></td></tr>
+  <tr><td>句読点（、。・「」）を無視</td><td><input type="checkbox" ${st.ignorePunct?'checked':''} onchange="setS('ignorePunct',this.checked)"></td></tr>
+  <tr><td>区切りの見出しを表示</td><td><input type="checkbox" ${st.showHead?'checked':''} onchange="setS('showHead',this.checked)"></td></tr></table>
+  <p class="sub">合格＝一致率がしきい値以上 かつ AI判定で意味が通っている かつ 禁忌違反なし。空白・改行・全角半角の違いは常に無視します。</p></div>
+
+  <div class="card"><h2>データ</h2><p class="sub" style="margin-top:0">理論データ：${DATA?`${ITEMS.length}件（${esc(DATA.source||'')}）`:'未読み込み'}</p>
+  <div class="row"><label class="b">理論データ／バックアップを読み込む<input type="file" accept=".json,application/json" style="display:none" onchange="importData(this.files[0])"></label>
+  <button class="b" onclick="exportJSON()">記録のバックアップ（JSON）</button><button class="b" onclick="exportCSV()">練習履歴をCSVで書き出す</button></div>
+  <p class="sub">旧版（HTMLファイル版）で書き出したバックアップJSONも読み込めます。</p></div>
+  <div class="card sub">消費税法 理論暗記 v2.1.0</div>`}
+function setS(k,v){S.settings[k]=v;S.settings.u=now();saveState()}
+function saveAI(){C.apiKey=document.getElementById('ak').value.trim();C.model=document.getElementById('am').value;C.aiOn=document.getElementById('ao').checked;saveConf();toast('保存しました')}
+async function testAI(){saveAI();const el=document.getElementById('aitest');el.innerHTML='<span class="spin"></span> テスト中…';
+  try{const a=await callAI({id:'test',q:'1-1',no:'1',title:'テスト'},{h:null,t:'事業者が行った資産の譲渡等には、消費税を課する。'},'事業者が行った資産の譲渡等には、消費税を課することができる。');
+    el.innerHTML=`<span class="ok">接続OK</span>（テスト判定：${a.meaning_ok?'意味OK':'意味NG'}・${esc(a.comment)}）`}catch(e){el.innerHTML=`<span class="ng">${esc(e.message)}</span>`}}
+function saveGH(){C.ghOwner=document.getElementById('go').value.trim();C.ghRepo=document.getElementById('gr').value.trim();C.ghToken=document.getElementById('gt').value.trim();C.device=document.getElementById('dv').value.trim();saveConf();syncNow(true)}
+function dl(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
+function exportJSON(){dl(`暗記記録_${TODAY()}.json`,JSON.stringify(S),'application/json')}
+function exportCSV(){const rows=[['日付','時刻','端末','問題','区分','理論','重要度','精度','判定','所要秒','速度(字/分)','禁忌違反']];
+  Object.values(ATT).flat().sort((a,b)=>a.ts-b.ts).forEach(a=>{const it=BYID[a.id]||{},t=new Date(a.ts);rows.push([a.date,pad(t.getHours())+':'+pad(t.getMinutes()),a.dev,it.q,it.no,it.title,it.stars,a.acc,a.pass?'○':'×',a.sec||'',speedOf(a)?Math.round(speedOf(a)):'',(a.blocks||[]).flatMap(b=>b.ai?b.ai.kinki:[]).join(' / ')])});
+  dl(`練習履歴_${TODAY()}.csv`,'﻿'+rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\r\n'),'text/csv')}
+function importBackup(d){if(!confirm('バックアップの記録を現在の記録に統合します。よろしいですか？'))return;
+  let R=d;
+  if(Array.isArray(d.attempts)){ // 旧版（v1）形式
+    R={v:2,attempts:{},deleted:{},plan:{},overrides:{},kinki:{},settings:S.settings};
+    d.attempts.forEach(a=>{const u=uid();R.attempts[u]={uid:u,ts:a.ts,date:a.date,id:a.id,acc:a.acc,pass:a.pass,dev:'旧版',blocks:(a.blocks||[]).map(b=>({acc:b.acc,pass:b.pass,n:0,helped:b.helped}))}});
+    for(const k in d.plan||{})R.plan[k]={ids:d.plan[k],u:1};for(const k in d.overrides||{})R.overrides[k]={blocks:d.overrides[k].blocks,u:1}}
+  S=merge(S,R);saveState();toast('統合しました');draw()}
+
+/* ---------- 起動 ---------- */
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+draw();syncNow(false);
+</script>
+</body>
+</html>
