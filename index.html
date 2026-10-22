@@ -110,6 +110,15 @@ details summary{cursor:pointer;color:var(--sub);font-size:13px}
 .cd{font-size:44px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}.cd.low{color:rgb(var(--r))}
 .studytext{white-space:pre-wrap;word-break:break-all;font-size:18px;line-height:2;background:#fffdf5;border:1px solid var(--line);border-radius:10px;padding:14px;-webkit-user-select:none;user-select:none}
 .bar.cdb i{transition:width .25s linear}
+/* 間違いの記録 */
+.e1{background:#fde4e0;border-radius:2px}.e2{background:#f8bfb5;border-radius:2px}.e3{background:#ef9384;border-radius:2px}.eg{background:#fbefd5;border-radius:2px}
+mark{background:#f8bfb5;color:inherit;border-radius:2px;padding:0 1px}
+.diff.inl{display:inline;padding:1px 5px;font-size:15px;line-height:1.9}
+.dots{display:inline-flex;gap:2px;vertical-align:middle;margin-left:4px}.dots i{width:8px;height:8px;border-radius:50%;background:rgb(var(--g))}.dots i.x{background:rgb(var(--r))}
+.erow{border-bottom:1px solid var(--line);padding:10px 0}.erow:last-child{border-bottom:none}
+.ecor,.evar{font-size:15px;line-height:1.9;word-break:break-all;margin-top:2px}
+.erep{font-size:14px;margin:4px 0 0;padding:6px 10px;background:#fdf1ef;border-radius:6px;word-break:break-all}
+.recur li{margin:6px 0;word-break:break-all}
 /* 読む */
 .rsec{scroll-margin-top:80px}
 .rblk{margin:12px 0 4px}
@@ -167,7 +176,7 @@ let S=ld(K_STATE,null)||initState();
 const DEF_SET={threshold:90,ignorePunct:false,ignoreMarks:true,showHead:true,memHead:true,targetSpeed:40,examDate:'',minWeekday:60,minWeekend:120,horizon:14,learnRate:12};
 S.settings=Object.assign({},DEF_SET,S.settings);S.schedule=S.schedule||null;S.pressure=S.pressure||{};
 let C=Object.assign({model:'claude-sonnet-5-5',aiOn:true,apiKey:'',ghOwner:'',ghRepo:'',ghToken:'',device:'',view:'q',pressAI:false,pSort:'hard'},ld(K_CONF,{}));
-let ITEMS=[],BYID={},QS=[],ATT={};
+let ITEMS=[],BYID={},QS=[],ATT={},MCACHE={};
 let SUSP=ld(K_SUSP,{});
 /* ---------- IndexedDB（解説データ用） ---------- */
 const IDB={p:null,open(){return this.p||(this.p=new Promise((res,rej)=>{const r=indexedDB.open('anki2',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}))},
@@ -178,7 +187,7 @@ async function setNotes(n){NOTES=n;await IDB.set('notes',n)}
 function setData(d){DATA=d;ITEMS=d?d.items:[];BYID=Object.fromEntries(ITEMS.map(i=>[i.id,i]));
   const seen={};QS=[];ITEMS.forEach(i=>{if(!seen[i.q]){seen[i.q]={q:i.q,qt:i.qt,ch:i.ch,items:[]};QS.push(seen[i.q])}seen[i.q].items.push(i)})}
 setData(DATA);
-function reindex(){ATT={};for(const a of Object.values(S.attempts)){if(S.deleted[a.uid])continue;(ATT[a.id]=ATT[a.id]||[]).push(a)}
+function reindex(){ATT={};MCACHE={};for(const a of Object.values(S.attempts)){if(S.deleted[a.uid])continue;(ATT[a.id]=ATT[a.id]||[]).push(a)}
   for(const k in ATT)ATT[k].sort((x,y)=>x.ts-y.ts);reindexP()}
 /* 圧迫暗記の記録（通常の練習記録とは別） */
 let PRA={},EZ_CUT=null;
@@ -382,7 +391,7 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
    画面
    ========================================================= */
 let tab='map',run=null,pr=null,rd=null;
-const TABS=[['map','マップ'],['today','今日の暗記'],['read','読む'],['press','圧迫暗記'],['plan','スケジュール'],['log','記録'],['kinki','禁忌事項'],['set','設定']];
+const TABS=[['map','マップ'],['today','今日の暗記'],['read','読む'],['press','圧迫暗記'],['err','間違い'],['plan','スケジュール'],['log','記録'],['kinki','禁忌事項'],['set','設定']];
 function nav(){document.getElementById('nav').innerHTML=TABS.map(([k,v])=>`<button class="${tab===k&&!run&&!pr?'on':''}" onclick="go('${k}')">${v}</button>`).join('')}
 /* 練習・圧迫暗記の途中で別の画面へ移るときは、途中経過を保存しておく（「続きから再開」で戻れる） */
 function leaveSession(){if((run||pr)&&saveSusp())toast('途中経過を保存しました。「続きから再開」で戻れます');run=null;TM.on=false;TM.ms=0;pr=null;PT.on=false}
@@ -390,7 +399,7 @@ function go(k){leaveSession();rd=null;tab=k;draw()}
 function draw(keepScroll){nav();drawSync();const m=document.getElementById('main');
   if(!DATA&&tab!=='set'){m.innerHTML=vNoData();return}
   const y=window.scrollY;
-  m.innerHTML=pr?vPress():run?vRun():tab==='map'?vMap():tab==='today'?vToday():tab==='read'?(rd?vRead():vReadList()):tab==='press'?vPList():tab==='plan'?vPlan():tab==='log'?vLog():tab==='kinki'?vKinki():vSet();
+  m.innerHTML=pr?vPress():run?vRun():tab==='map'?vMap():tab==='today'?vToday():tab==='read'?(rd?vRead():vReadList()):tab==='press'?vPList():tab==='err'?vErr():tab==='plan'?vPlan():tab==='log'?vLog():tab==='kinki'?vKinki():vSet();
   if(pr){if(pr.ph==='test'){const t=document.getElementById('phead')||document.getElementById('pans');if(t)t.focus({preventScroll:true})}else if(pr.ph!=='study')focusNext();ptick()}
   else if(run){const t=document.getElementById('ans');if(t)t.focus({preventScroll:true});timerSync()}
   if(run||pr)saveSusp();
@@ -449,7 +458,7 @@ function openQ(qid,focus){const q=QS.find(x=>x.q===qid),p=new Set(planOf());
   <table><tr><th></th><th>セクション</th><th class="n">最新</th><th class="n hide-sm">実施日</th><th class="n hide-sm">次回</th><th></th></tr>`;
   for(const i of q.items){const st=itemStatus(i.id),t=toneStyle(st),s=srsOf(i.id),n=attemptsOf(i.id).length;
     h+=`<tr style="${focus===i.id?'background:var(--brands)':''}"><td><span class="sw" style="${t.style}"></span></td>
-    <td>〔${i.no}〕 ${esc(i.title)} ${stars(i.stars)}${kinkiFor(i.id).some(k=>k.scope!=='g')?' <span class="pill ng">禁忌あり</span>':''}<div class="sub">${n?`${n}回練習`:'未実施'}${pAtt(i.id).length?`・圧迫${pAtt(i.id).length}回 ${Math.round(easeOf(i.id))}字/分 ${ezTag(easeClass(i.id))}`:''}</div></td>
+    <td>〔${i.no}〕 ${esc(i.title)} ${stars(i.stars)}${kinkiFor(i.id).some(k=>k.scope!=='g')?' <span class="pill ng">禁忌あり</span>':''}<div class="sub">${n?`${n}回練習`:'未実施'}${repCount(i.id)?`・<span class="ng">くり返し間違い${repCount(i.id)}か所</span>`:''}${pAtt(i.id).length?`・圧迫${pAtt(i.id).length}回 ${Math.round(easeOf(i.id))}字/分 ${ezTag(easeClass(i.id))}`:''}</div></td>
     <td class="n">${st?`<span class="${st.pass?'ok':'ng'}">${pct(st.acc)}</span>`:'–'}</td><td class="n hide-sm sub">${st?st.date.slice(5):''}</td><td class="n hide-sm sub">${s?s.due.slice(5):''}</td>
     <td class="n"><button class="b s" onclick="closeSheet();openRead('${q.q}','${i.id}')">読む</button><button class="b s p" onclick="closeSheet();startQueue(['${i.id}'])">練習</button><button class="b s" onclick="closeSheet();pQueue(['${i.id}'])">圧迫</button>
     <button class="b s" onclick="togglePlan('${i.id}');openQ('${qid}','${focus||''}')">${p.has(i.id)?'予定から外す':'今日に追加'}</button></td></tr>`}
@@ -518,10 +527,11 @@ function vRun(){
     <span class="grow"></span>${S.overrides[run.id]&&S.overrides[run.id].blocks?`<button class="b s" onclick="resetEdit()">元のテキストに戻す</button>`:''}</div></div>`}
   if(!g){
     const kk=kinkiFor(run.id).filter(k=>k.scope!=='g');
-    h+=`${kk.length?`<div class="kinki"><b>この理論の禁忌：</b>${kk.map(k=>esc(k.text)).join('／')}</div>`:''}
+    const M0=mistakesOf(run.id,run.i),nr=M0?M0.clusters.filter(c=>c.status==='rep').length:0;
+    h+=`${kk.length?`<div class="kinki"><b>この理論の禁忌：</b>${kk.map(k=>esc(k.text)).join('／')}</div>`:''}${nr?`<p class="sub ng" style="margin:4px 0">この区切りには、くり返し間違えている箇所が ${nr} か所あります（採点後に表示します）</p>`:''}
     <div class="row" style="margin-bottom:6px"><span id="tmr" class="timer"></span></div>
     <textarea id="ans" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="覚えた内容を入力" oninput="run.draft=this.value;touch();suspSoon()" oncompositionupdate="touch()" onkeydown="touch();if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();grade()}">${esc(run.draft)}</textarea>
-    ${run.hint?`<div class="hint">ヒント：${esc(norm(tgt(b)).slice(0,run.hint))}…</div>`:''}${run.peek?`<div class="answer" style="margin-top:8px">${esc(tgt(b))}</div>`:''}
+    ${run.hint?`<div class="hint">ヒント：${esc(norm(tgt(b)).slice(0,run.hint))}…</div>`:''}${run.peek?`<div class="answer" style="margin-top:8px">${spanHTML(tgt(b),errCls(tgt(b),mistakesOf(run.id,run.i)))}</div>`:''}
     <div class="row" style="margin-top:10px"><button class="b p" onclick="grade()">採点 <kbd>Ctrl/⌘+Enter</kbd></button><button class="b" onclick="run.hint+=10;draw()">ヒント</button>
     <button class="b" onclick="run.peek=!run.peek;draw()">${run.peek?'正解を隠す':'正解を見る'}</button><span class="grow"></span><button class="b s" onclick="run.edit=true;draw()">正解テキストを編集</button></div>
     ${run.hint||run.peek?`<p class="sub">ヒント／正解表示を使った区切りは不合格として記録されます。</p>`:''}`;
@@ -532,7 +542,7 @@ function vRun(){
      所要時間 <b>${fmtSec(g.sec)}</b>（正しく書けた字で ${g.sec>0?Math.round(g.match/(g.sec/60)):'–'}字/分・目標 ${S.settings.targetSpeed}字/分）${g.sec>0&&g.acc>=S.settings.threshold&&g.match/(g.sec/60)<S.settings.targetSpeed*.75?' <span class="slow">遅</span>':''}</span><span class="grow"></span>
      <button class="b s" onclick="g_flip()">${pass?'×にする':'○にする'}</button></div>
      <div class="sub" style="margin-bottom:6px"><span style="background:var(--miss);padding:0 4px">赤＝書けなかった</span>　<span style="background:var(--extra);text-decoration:line-through;padding:0 4px">灰＝余分</span></div>
-     <div class="diff">${renderDiff(g.ops)}</div>${vAI(g)}
+     <div class="diff">${renderDiff(g.ops)}</div>${recurHTML(run.id,run.i,g)}${vAI(g)}
      <details style="margin-top:8px"><summary>自分の解答</summary><div class="answer">${esc(g.input)}</div></details>
      <div class="row" style="margin-top:12px"><button class="b p" id="nx" onclick="next()" ${g.aiState==='pending'?'disabled':''}>${run.i+1<B.length?'次の区切りへ':'この理論の結果を記録'} <kbd>Enter</kbd></button>
      ${g.aiState==='pending'?`<button class="b" onclick="g_skipAI()">AI判定を待たずに進む</button>`:''}<button class="b" onclick="retry()">やり直す</button></div>`;
@@ -553,10 +563,11 @@ function vAI(g){
   if(a.comment)h+=`<div class="sub">講評：${esc(a.comment)}</div>`;
   return h+`</div>`;
 }
+const aiCE=a=>(a.critical_errors||[]).slice(0,5).map(e=>[String(e.correct||'').slice(0,40),String(e.written||'').slice(0,40)]);
 function passOf(g){if(g.manual!=null)return g.manual;if(g.helped)return false;if(g.acc<S.settings.threshold)return false;
   if(g.ai&&(!g.ai.meaning_ok||g.ai.kinki_violations.length))return false;return true}
 function grade(){const b=blocksOf(run.id)[run.i],input=run.draft||'';tick();TM.on=false;
-  const d=diff(norm(tgt(b)),norm(input));run.graded={...d,input,sec:TM.ms/1000,helped:run.hint>0||run.peek,ai:null,aiState:aiReady()?'pending':'off',manual:null};
+  const T=norm(tgt(b)),d=withErr(diff(T,norm(input)),T);run.graded={...d,input,sec:TM.ms/1000,helped:run.hint>0||run.peek,ai:null,aiState:aiReady()?'pending':'off',manual:null};
   draw();if(run.graded.aiState==='pending')runAI();else focusNext()}
 function focusNext(){setTimeout(()=>{const n=document.getElementById('nx');n&&n.focus({preventScroll:true})},0)}
 /* 採点中の区切り（通常の練習／圧迫暗記のどちらか） */
@@ -571,8 +582,8 @@ function regKinki(k,scope){const R=pr||run,e=curG().ai.critical_errors[k];
   const txt=prompt('禁忌事項として登録する内容（編集できます）',`「${e.correct}」を「${e.written}」と書かない（${e.reason}）`);if(!txt)return;
   S.kinki[uid()]={scope:scope==='g'?'g':R.id,text:txt.trim(),u:now()};saveState();toast('禁忌事項に登録しました')}
 function next(){const g=run.graded;if(!g||g.aiState==='pending')return;
-  run.res.push({acc:Math.round(g.acc*10)/10,pass:passOf(g),n:g.n,m:g.match,sec:Math.round(g.sec),helped:g.helped,
-    ai:g.ai?{ok:g.ai.meaning_ok,score:g.ai.meaning_score,crit:g.ai.critical_errors.length,kinki:g.ai.kinki_violations.map(k=>k.rule)}:null});
+  run.res.push({acc:Math.round(g.acc*10)/10,pass:passOf(g),n:g.n,m:g.match,sec:Math.round(g.sec),helped:g.helped,...errRec(g),
+    ai:g.ai?{ok:g.ai.meaning_ok,score:g.ai.meaning_score,crit:g.ai.critical_errors.length,kinki:g.ai.kinki_violations.map(k=>k.rule),ce:aiCE(g.ai)}:null});
   run.i++;run.graded=null;run.hint=0;run.peek=false;run.draft='';TM.ms=0;TM.on=false;if(run.i>=blocksOf(run.id).length)record();draw()}
 function record(){const tot=run.res.reduce((s,r)=>s+r.n,0)||1,acc=run.res.reduce((s,r)=>s+r.acc*r.n,0)/tot,pass=run.res.every(r=>r.pass),t=TODAY(),u=uid();
   const sec=run.res.reduce((s,r)=>s+(r.sec||0),0);
@@ -639,13 +650,13 @@ function pBegin(){if(!pr)return;pr.ph='study';pr.allot=pAllot(blocksOf(pr.id)[pr
 function endStudy(auto){if(!pr||pr.ph!=='study')return;ptAdd();
   pr.study=Math.min(pr.allot,Math.round(PT.ms/100)/10);pr.ph='test';pTimer(true);draw();if(auto)toast('時間です。すぐに書いてください')}
 function pGrade(){if(!pr||pr.ph!=='test')return;ptAdd();PT.on=false;
-  const b=blocksOf(pr.id)[pr.i],hl=headLabel(b),input=hl?(pr.hdraft||'')+'\n'+(pr.draft||''):(pr.draft||''),d=diff(norm(tgt(b)),norm(input));
+  const b=blocksOf(pr.id)[pr.i],hl=headLabel(b),input=hl?(pr.hdraft||'')+'\n'+(pr.draft||''):(pr.draft||''),d=withErr(diff(norm(tgt(b)),norm(input)),norm(tgt(b)));
   const hd=hl?diff(norm(hl),norm(pr.hdraft||'')):null;
   const st=!C.pressAI?'poff':aiReady()?'pending':'off';
   pr.g={...d,input,hd,hin:pr.hdraft||'',sec:PT.ms/1000,helped:false,ai:null,aiState:st,manual:null};pr.ph='graded';draw();if(st==='pending')runAI()}
 function pNext(){const g=pr&&pr.g;if(!g||g.aiState==='pending')return;const b=blocksOf(pr.id)[pr.i];
-  pr.res.push({h:b.h||'',n:g.n,m:g.match,acc:Math.round(g.acc*10)/10,pass:passOf(g),allot:pr.allot,study:pr.study,test:Math.round(g.sec),
-    ai:g.ai?{ok:g.ai.meaning_ok,score:g.ai.meaning_score,kinki:g.ai.kinki_violations.map(k=>k.rule)}:null});
+  pr.res.push({h:b.h||'',n:g.n,m:g.match,acc:Math.round(g.acc*10)/10,pass:passOf(g),allot:pr.allot,study:pr.study,test:Math.round(g.sec),...errRec(g),
+    ai:g.ai?{ok:g.ai.meaning_ok,score:g.ai.meaning_score,kinki:g.ai.kinki_violations.map(k=>k.rule),ce:aiCE(g.ai)}:null});
   pr.i++;pr.g=null;pr.draft='';
   if(pr.i<blocksOf(pr.id).length){pBegin();return}
   pRecord();pr.ph='done';draw()}
@@ -684,7 +695,7 @@ function vPress(){const it=BYID[pr.id],B=blocksOf(pr.id),spc=PLV[pr.lv];
    <button class="b s" onclick="g_flip()">${pass?'×にする':'○にする'}</button></div>
    <div class="sub" style="margin-bottom:6px"><span style="background:var(--miss);padding:0 4px">赤＝書けなかった</span>　<span style="background:var(--extra);text-decoration:line-through;padding:0 4px">灰＝余分</span></div>
    ${g.hd?`<div style="margin-bottom:6px">見出し：${g.hd.miss||g.hd.extra?'<span class="ng">×</span>':'<span class="ok">○</span>'} 正解「${esc(headLabel(b))}」${g.hd.miss||g.hd.extra?`／あなた「${esc(g.hin)||'（空欄）'}」`:''}</div>`:''}
-   <div class="diff">${renderDiff(g.ops)}</div>${vAI(g)}
+   <div class="diff">${renderDiff(g.ops)}</div>${recurHTML(pr.id,pr.i,g)}${vAI(g)}
    <div class="row" style="margin-top:12px"><button class="b p" id="nx" onclick="pNext()" ${g.aiState==='pending'?'disabled':''}>${pr.i+1<B.length?'次の区切りへ（すぐ表示が始まります）':'結果を記録'} <kbd>Enter</kbd></button>
    ${g.aiState==='pending'?`<button class="b" onclick="g_skipAI()">AI判定を待たずに進む</button>`:''}</div></div>`}
 function vPDone(){const a=pr.rec,more=pr.qi+1<pr.queue.length,nl=pLevel(pr.id),ez=easeOf(pr.id);
@@ -781,13 +792,14 @@ const PLAN_SYS=`あなたは税理士試験「消費税法」の理論暗記を�
 6. 各日の合計見込み時間（min の合計）は、その日の使える時間を超えない（最大+10%）。使える時間が0分の日は空にする。
 7. min には与えられた見込み時間（新規なら「新規見込み」、それ以外は「練習見込み」）を基本として使う。
 8. 「覚えやすさ」は圧迫暗記（短時間だけ見て即テスト）で測った、覚えるのに使った1分あたりに正しく書けた字数で、空欄は未計測。「難」の理論は覚えにくいので、新規なら早めに着手して min に2〜3割の余裕を持たせ、復習も間隔を詰める。「易」の理論は後回しにしてよい。
+9. 「くり返し間違い」は、同じ言い回しを2回以上書き間違え、まだ直っていない箇所の数。多い理論は、誤った言い回しが定着しかけているので、合格していても fix として早めに練習に入れる。
 
 出力は次のJSONオブジェクトのみ（前後に文章やコードフェンスを付けない）:
 {"strategy":"全体方針（250字以内）","milestones":["節目となる目標（例：11月末までに★★を一巡）"],"days":[{"date":"YYYY-MM-DD","items":[{"id":"理論ID","kind":"new|review|fix|speed","min":整数}],"note":"その日の狙い（40字以内）"}]}`;
 async function aiPlan(){const st=S.settings,t=TODAY(),o=overview(),sp=mySpeed();
   const dayLines=[];for(let k=0;k<st.horizon;k++){const d=addDays(t,k);dayLines.push(`${d}（${'日月火水木金土'[new Date(d+'T00:00:00').getDay()]}）${budgetOf(d)}分`)}
   const rows=ITEMS.map(i=>{const A=attemptsOf(i.id),l=A[A.length-1],s=srsOf(i.id),v=l?speedOf(l):null;
-    return [i.id,'★'.repeat(i.stars)||'-',(i.qt+'／'+i.title).slice(0,24),charsOf(i.id),A.length,l?Math.round(l.acc):'',l?(l.pass?'合格':'不合格'):'',l?l.date:'',v?Math.round(v):'',l?({slow:'遅',mid:'やや遅',fast:'速',na:'-'}[speedClass(l)]):'',s?s.due:'',Math.round(estPractice(i.id)),Math.round(estNew(i.id)),easeOf(i.id)!=null?Math.round(easeOf(i.id))+({e:'易',m:'普',h:'難'}[easeClass(i.id)]):''].join('|')});
+    return [i.id,'★'.repeat(i.stars)||'-',(i.qt+'／'+i.title).slice(0,24),charsOf(i.id),A.length,l?Math.round(l.acc):'',l?(l.pass?'合格':'不合格'):'',l?l.date:'',v?Math.round(v):'',l?({slow:'遅',mid:'やや遅',fast:'速',na:'-'}[speedClass(l)]):'',s?s.due:'',Math.round(estPractice(i.id)),Math.round(estNew(i.id)),easeOf(i.id)!=null?Math.round(easeOf(i.id))+({e:'易',m:'普',h:'難'}[easeClass(i.id)]):'',repCount(i.id)||''].join('|')});
   const user=`今日: ${t}
 試験日: ${st.examDate||'未設定'}${o.left!=null?`（あと${o.left}日）`:''}
 計画期間と各日の使える時間:
@@ -795,7 +807,7 @@ ${dayLines.join('\n')}
 目標速度: ${st.targetSpeed}字/分　この受験生の実測中央値: ${Math.round(sp)}字/分
 現状: 未学習${o.un}件（うち★★${o.un2}件）、不合格${o.red}件、遅い${o.slow}件、定着${o.green}件、期限到来${o.due}件
 
-理論一覧（列: ID|重要度|問題／セクション|字数|練習回数|最新精度|最新判定|最終実施日|最新速度(字/分)|速度判定|次回期限|練習見込み(分)|新規見込み(分)|覚えやすさ(字/分・易普難)）
+理論一覧（列: ID|重要度|問題／セクション|字数|練習回数|最新精度|最新判定|最終実施日|最新速度(字/分)|速度判定|次回期限|練習見込み(分)|新規見込み(分)|覚えやすさ(字/分・易普難)|くり返し間違い(か所)）
 ${rows.join('\n')}`;
   const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':C.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
     body:JSON.stringify({model:C.model,max_tokens:16000,system:PLAN_SYS,messages:[{role:'user',content:user}]})});
@@ -912,7 +924,7 @@ function vSet(){const st=S.settings;
   <div class="row"><label class="b">理論データ／解説データ／バックアップを読み込む<input type="file" accept=".json,application/json" style="display:none" onchange="importData(this.files[0])"></label>
   <button class="b" onclick="exportJSON()">記録のバックアップ（JSON）</button><button class="b" onclick="exportCSV()">練習履歴をCSVで書き出す</button></div>
   <p class="sub">旧版（HTMLファイル版）で書き出したバックアップJSONも読み込めます。</p></div>
-  <div class="card sub">消費税法 理論暗記 v2.3</div>`}
+  <div class="card sub">消費税法 理論暗記 v2.4</div>`}
 function setS(k,v){S.settings[k]=v;S.settings.u=now();saveState()}
 function saveAI(){C.apiKey=document.getElementById('ak').value.trim();C.model=document.getElementById('am').value;C.aiOn=document.getElementById('ao').checked;saveConf();toast('保存しました')}
 async function testAI(){saveAI();const el=document.getElementById('aitest');el.innerHTML='<span class="spin"></span> テスト中…';
@@ -1001,10 +1013,10 @@ function notesMap(q){const N=notesOf(q);if(!N)return null;const nos=new Set(QS.f
   const put=(k,x)=>{const s=(x.secs||[]).filter(n=>nos.has(n));if(!s.length)m.general[k].push(x);else s.forEach(n=>{(m[n]=m[n]||{yoshi:[],items:[]})[k].push(x)})};
   (N.yoshi||[]).forEach(y=>put('yoshi',y));(N.items||[]).forEach(i=>put('items',i));return m}
 /* 条文の行を、テキストのように字下げして表示する（①…は1段、イ・ロ…は2段、その下の文は一段深く） */
-function lawHTML(t){let lv=0;return t.split('\n').map(line=>{let L=null;
+function lawHTML(t,cls,off=0){let lv=0,pos=off;return t.split('\n').map(line=>{let L=null;const o=pos;pos+=line.length+1;const inner=spanHTML(line,cls,o);
     if(/^[⑴-⒇]/.test(line))L=0;else if(/^[①-⑳]/.test(line))L=1;else if(/^[イロハニホヘトチリヌ](?=[\s　]|[一-龥（])/.test(line))L=2;else if(/^（[0-9０-９]+）|^\([0-9]+\)/.test(line))L=3;
-    if(L!=null){lv=L;return `<div style="margin-left:${Math.max(0,L-1)*1.2}em">${esc(line)}</div>`}
-    return `<div style="margin-left:${lv*1.2}em;text-indent:1em">${esc(line)}</div>`}).join('')}
+    if(L!=null){lv=L;return `<div style="margin-left:${Math.max(0,L-1)*1.2}em">${inner}</div>`}
+    return `<div style="margin-left:${lv*1.2}em;text-indent:1em">${inner}</div>`}).join('')}
 const imgHTML=p=>`<img src="${p.img}" width="${p.w}" height="${p.h}" loading="lazy" alt="図">`;
 function noteBody(m){let h='';
   if(m.yoshi.length)h+=`<div class="lab">要旨</div>`+m.yoshi.map(y=>y.parts.map(imgHTML).join('')).join('');
@@ -1030,7 +1042,9 @@ function vRead(){const qi=QS.findIndex(x=>x.q===rd.q),q=QS[qi];if(!q){rd=null;re
     <button class="b s" ${prev?`onclick="openRead('${prev.q}')"`:'disabled'}>‹ 前の問題</button><button class="b s" ${next?`onclick="openRead('${next.q}')"`:'disabled'}>次の問題 ›</button></div>
    <div class="row" style="margin-top:6px"><label class="sub"><input type="checkbox" ${C.readNotes!==false?'checked':''} onchange="C.readNotes=this.checked;saveConf();draw(1)"> 解説を開いて表示</label>
     <label class="sub"><input type="checkbox" ${hide?'checked':''} onchange="C.readHide=this.checked;saveConf();draw(1)"> 本文を隠す（タップで表示）</label>
+    <label class="sub"><input type="checkbox" ${C.readErr!==false?'checked':''} onchange="C.readErr=this.checked;saveConf();draw(1)"> 間違えた所に色をつける</label>
     <span class="grow"></span><button class="b s p" onclick="startQueue(${ids})">この問題を練習</button><button class="b s" onclick="pQueue(${ids})">圧迫暗記</button></div></div>`;
+  if(C.readErr!==false&&!hide&&q.items.some(i=>attemptsOf(i.id).length||pAtt(i.id).length))h+=`<div class="card" style="padding:8px 14px">${ERR_LEGEND}</div>`;
   if(!NOTES&&notesLoaded)h+=`<div class="card sub">解説データが未読み込みのため、条文だけを表示しています（「読む」の一覧画面か設定画面から <b>解説データ.json</b> を読み込めます）。</div>`;
   if(nm)h+=noteBox(nm.general,'この問題の解説（概要など）').replace('<details class="note"','<details class="note card"');
   for(const it of q.items){const B=blocksOf(it.id),st=itemStatus(it.id);
@@ -1038,11 +1052,146 @@ function vRead(){const qi=QS.findIndex(x=>x.q===rd.q),q=QS[qi];if(!q){rd=null;re
       <span class="sub grow">${st?`最新 <span class="${st.pass?'ok':'ng'}">${pct(st.acc)}</span>`:'未練習'}${pAtt(it.id).length?' '+ezTag(easeClass(it.id)):''}</span>
       ${hide?`<button class="b s" onclick="document.querySelectorAll('#sec-${it.id} .rtext').forEach(e=>e.classList.remove('hid'))">すべて表示</button>`:''}
       <button class="b s p" onclick="startQueue(['${it.id}'])">練習</button><button class="b s" onclick="pQueue(['${it.id}'])">圧迫</button></div>`;
-    for(const b of B)h+=`<div class="rblk">${b.h?`<div class="rh">${esc(b.h)}</div>`:''}<div class="rtext${hide?' hid':''}" onclick="this.classList.remove('hid')">${lawHTML(b.t)}</div></div>`;
+    B.forEach((b,k)=>{const M=C.readErr!==false&&!hide?mistakesOf(it.id,k):null,raw=tgt(b),cls=M?errCls(raw,M):null,hl=headLabel(b),off=hl?hl.length+1:0;
+      const hp=headParts(b.h),head=b.h?(cls&&hl?esc(hp.no)+(hp.no?' ':'')+spanHTML(hl,cls,0):esc(b.h)):'';
+      const reps=M?M.clusters.filter(c=>c.status==='rep'):[];
+      h+=`<div class="rblk">${head?`<div class="rh">${head}</div>`:''}<div class="rtext${hide?' hid':''}" onclick="this.classList.remove('hid')">${lawHTML(b.t,cls,off)}</div>
+       ${reps.map(c=>`<div class="erep"><span class="pill ng">${c.count}回</span> 正「${corWin(M,c)}」　誤「<span class="diff inl">${varHTML(M,c,c.vars[0].w)}</span>」</div>`).join('')}</div>`});
     if(nm)h+=noteBox(nm[+it.no],'解説');
     h+=`</div>`}
   h+=`<div class="row" style="justify-content:space-between">${prev?`<button class="b" onclick="openRead('${prev.q}')">‹ 問題 ${prev.q} ${esc(prev.qt)}</button>`:'<span></span>'}${next?`<button class="b p" onclick="openRead('${next.q}')">問題 ${next.q} ${esc(next.qt)} ›</button>`:''}</div>`;
   return h}
+
+/* =========================================================
+   間違いの記録（v2.4）
+   採点のたびに、正解との文字比較から「どこを・どう間違えたか」を区切りごとに記録する。
+   記録（attempt.blocks[k]）に追加する項目：
+     e : [{p,n,m,w,b}]  p=正解（正規化後）の何文字目から, n=正解側の字数, m=正解側の文字（40字まで）,
+                        w=自分が書いた文字（40字まで）, b=直前4文字（正解テキストが修正されたときの位置合わせ用）
+     th: 正解テキスト（正規化後）のハッシュ, tl: その字数
+   近い位置の間違い（間に一致が2文字以下）は1つにまとめる。30字以上ほとんど書けていない所は「脱落」として別扱い。
+   集計：同じ区切りの過去の記録を位置で重ね、くり返し間違えている箇所（2回以上）を一覧にする。
+   ========================================================= */
+const GAP_N=30,E_MAX=40,CTX=6;
+function hash32(s){let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,0x01000193)}return (h>>>0).toString(36)}
+function errsOf(ops,T){const segs=[];let ti=0,cur=null;
+  for(const [t,c] of ops){if(t==='='){if(cur){segs.push(cur);cur=null}ti++;continue}
+    if(!cur)cur={p:ti,m:'',w:''};if(t==='m'){cur.m+=c;ti++}else cur.w+=c}
+  if(cur)segs.push(cur);
+  const out=[];for(const s of segs){const L=out[out.length-1];
+    if(L&&s.p-(L.p+L.m.length)<=2&&L.m.length<GAP_N&&s.m.length<GAP_N){const mid=T.slice(L.p+L.m.length,s.p);L.m+=mid+s.m;L.w+=mid+s.w}else out.push({...s})}
+  return out.map(s=>({p:s.p,n:s.m.length,m:s.m.slice(0,E_MAX),w:s.w.slice(0,E_MAX),b:T.slice(Math.max(0,s.p-4),s.p)}))}
+const isGapE=e=>e.n>=GAP_N&&(e.w||'').length<e.n/3;
+/* 採点結果に間違いの記録を付ける（練習・圧迫暗記共通） */
+function withErr(d,T){return {...d,T,th:hash32(T),err:errsOf(d.ops,T)}}
+const errRec=g=>g&&g.err?{e:g.err,th:g.th,tl:(g.T||'').length}:{};
+
+/* ---------- 集計 ---------- */
+/* MCACHE（集計のキャッシュ）は先頭の ATT の隣で宣言 */
+function resolveP(e,r,T,th){if(r.th===th)return e.p;const key=(e.b||'')+(e.m||'');if(!key)return null;
+  const guess=r.tl?e.p*T.length/r.tl:e.p;let best=null,bd=1e9,i=T.indexOf(key);
+  while(i>=0){const d=Math.abs(i+(e.b||'').length-guess);if(d<bd){bd=d;best=i+(e.b||'').length}i=T.indexOf(key,i+1)}return best}
+function mistakesOf(id,k){const key=id+'#'+k;if(MCACHE[key]!==undefined)return MCACHE[key];
+  const b=blocksOf(id)[k];if(!b)return MCACHE[key]=null;const T=norm(tgt(b)),th=hash32(T);
+  const atts=[...attemptsOf(id).map(a=>({a,src:'練習'})),...pAtt(id).map(a=>({a,src:'圧迫'}))]
+    .filter(x=>x.a.blocks&&x.a.blocks[k]&&Array.isArray(x.a.blocks[k].e)).sort((x,y)=>x.a.ts-y.a.ts);
+  const heat=new Uint16Array(T.length),gap=new Uint16Array(T.length),occ=[];
+  atts.forEach((x,ai)=>{const r=x.a.blocks[k];
+    const ce=((r.ai&&r.ai.ce)||[]).map(c=>norm(c[0]||''));
+    for(const e of r.e){const p=resolveP(e,r,T,th);if(p==null||p>T.length)continue;
+      if(isGapE(e)){for(let i=p;i<Math.min(T.length,p+e.n);i++)gap[i]++;continue}
+      const en=Math.min(T.length,p+Math.max(e.n,1));for(let i=p;i<en;i++)heat[i]++;
+      occ.push({ai,s:p,e:Math.max(en,p+1),n:e.n,w:e.w||'',ts:x.a.ts,date:x.a.date,src:x.src,ce})}});
+  occ.sort((a,b)=>a.s-b.s);const cl=[];
+  for(const o of occ){const c=cl[cl.length-1];if(c&&o.s<=c.e+1){c.e=Math.max(c.e,o.e);c.occ.push(o)}else cl.push({s:o.s,e:o.e,occ:[o]})}
+  for(const c of cl){const set=new Set(c.occ.map(o=>o.ai));c.atts=[...set].sort((a,b)=>a-b);c.count=c.atts.length;
+    c.lastTs=Math.max(...c.occ.map(o=>o.ts));c.lastDate=c.occ.find(o=>o.ts===c.lastTs).date;
+    let st=0;for(let i=atts.length-1;i>=0&&!set.has(i);i--)st++;c.streak=st;   // 最近、続けて正しく書けた回数
+    c.hist=atts.map((x,i)=>set.has(i)).slice(-8);
+    c.ws=Math.max(0,c.s-CTX);c.we=Math.min(T.length,c.e+CTX);
+    const core=T.slice(c.s,c.e);c.ai=c.occ.some(o=>o.ce.some(x=>x&&(x.includes(core)||core.includes(x))));
+    // 書き方ごとにまとめる（その回の、この箇所の間違いをすべて当てはめた文）
+    const byA={};for(const o of c.occ)(byA[o.ai]=byA[o.ai]||[]).push(o);
+    const vm={};for(const ai in byA){const w=writtenWin(T,c.ws,c.we,byA[ai]);(vm[w]=vm[w]||{w,n:0,last:0}).n++;vm[w].last=Math.max(vm[w].last,byA[ai][0].ts)}
+    c.vars=Object.values(vm).sort((a,b)=>b.n-a.n||b.last-a.last);
+    c.status=c.count>=2?(c.streak>=2?'fixed':'rep'):'once'}
+  return MCACHE[key]={T,th,atts,clusters:cl,heat,gap}}
+function writtenWin(T,ws,we,list){let s=T.slice(ws,we);
+  for(const o of list.slice().sort((a,b)=>b.s-a.s)){const a=o.s-ws;if(a<0||a>s.length)continue;s=s.slice(0,a)+o.w+s.slice(a+o.n)}return s}
+const corWin=(M,c)=>esc(M.T.slice(c.ws,c.s))+`<mark>${esc(M.T.slice(c.s,c.e))}</mark>`+esc(M.T.slice(c.e,c.we));
+const varHTML=(M,c,w)=>renderDiff(diff(M.T.slice(c.ws,c.we),w).ops);
+const histDots=c=>`<span class="dots">${c.hist.map(x=>`<i class="${x?'x':'o'}"></i>`).join('')}</span>`;
+function repCount(id){let n=0;const B=blocksOf(id);for(let k=0;k<B.length;k++){const M=mistakesOf(id,k);if(M)n+=M.clusters.filter(c=>c.status==='rep').length}return n}
+
+/* ---------- 採点画面：前にも間違えた箇所 ---------- */
+function recurHTML(id,k,g){if(!g||!g.err)return '';const M=mistakesOf(id,k);if(!M||M.th!==g.th||!M.clusters.length)return '';
+  const cur=g.err.filter(e=>!isGapE(e)).map(e=>({s:e.p,e:e.p+Math.max(e.n,1),n:e.n,w:e.w}));
+  const rep=[],ok=[];
+  for(const c of M.clusters){const hits=cur.filter(x=>x.s<=c.e&&x.e>=c.s);if(hits.length)rep.push([c,hits]);else if(c.count>=2)ok.push(c)}
+  if(!rep.length&&!ok.length)return '';
+  let h=`<div class="ai recur"><h4>前の記録との比較</h4>`;
+  if(rep.length)h+=`<b style="font-size:13px" class="ng">前にも間違えた箇所</b><ul>${rep.map(([c,hits])=>`<li><span class="pill ng">${c.count+1}回目</span> 正しくは「${corWin(M,c)}」<br>
+     <span class="sub">今回：</span><span class="diff inl">${varHTML(M,c,writtenWin(M.T,c.ws,c.we,hits))}</span>
+     ${c.vars[0]?`<br><span class="sub">前回まで多い書き方：</span><span class="diff inl">${varHTML(M,c,c.vars[0].w)}</span> <span class="sub">×${c.vars[0].n}</span>`:''}</li>`).join('')}</ul>`;
+  if(ok.length)h+=`<b style="font-size:13px" class="ok">今回は正しく書けた（前にくり返し間違えていた箇所）</b><ul>${ok.slice(0,5).map(c=>`<li>「${corWin(M,c)}」 <span class="sub">これまで${c.count}回間違い</span></li>`).join('')}</ul>`;
+  return h+`</div>`}
+
+/* ---------- 正解テキストに色をつける（読む・正解を見る） ----------
+   norm() と同じ処理を1文字ずつ行い、正規化後の各文字が元のテキストの何文字目かを対応づける */
+function normMap(s){const rm=new Uint8Array(s.length);
+  if(S.settings.ignoreMarks){const re=new RegExp(MARK_RE.source,'gm');let m;while((m=re.exec(s))){for(let i=m.index;i<m.index+m[0].length;i++)rm[i]=1;if(!m[0].length)re.lastIndex++}}
+  let out='';const idx=[];
+  for(let i=0;i<s.length;i++){if(rm[i])continue;let t=s[i].normalize('NFKC').replace(/\s+/g,'');if(S.settings.ignorePunct)t=t.replace(/[、。,.，．・「」『』]/g,'');
+    for(const ch of t){out+=ch;idx.push(i)}}
+  return out===norm(s)?idx:null}
+/* 元テキスト s の各文字のクラス（e1〜e3＝言い回しの間違いの回数、eg＝書けなかった所）。対応がとれなければ null */
+function errCls(s,M){if(!M||(!M.clusters.length&&!M.gap.some(x=>x)))return null;const idx=normMap(s);if(!idx||idx.length!==M.T.length)return null;
+  const cls=new Array(s.length).fill('');
+  for(let j=0;j<idx.length;j++){const h=M.heat[j];const c=h>=3?'e3':h===2?'e2':h===1?'e1':M.gap[j]?'eg':'';if(c&&!cls[idx[j]])cls[idx[j]]=c}
+  // 記号などで途切れた所を前後と同じ色でつなぐ
+  for(let i=1;i<s.length-1;i++)if(!cls[i]&&cls[i-1]&&cls[i-1]===cls[i+1]&&!/\n/.test(s[i]))cls[i]=cls[i-1];
+  return cls}
+function spanHTML(s,cls,off=0){if(!cls)return esc(s);let h='',cur='',buf='';
+  const fl=()=>{if(buf)h+=cur?`<span class="${cur}">${esc(buf)}</span>`:esc(buf);buf=''};
+  for(let i=0;i<s.length;i++){const c=cls[off+i]||'';if(c!==cur){fl();cur=c}buf+=s[i]}fl();return h}
+const ERR_LEGEND=`<span class="sub">色：<span class="e1">1回</span> <span class="e2">2回</span> <span class="e3">3回以上</span> 言い回しを間違えた所　<span class="eg">書けなかった所</span></span>`;
+
+/* ---------- 間違いノート（タブ） ---------- */
+function vErr(){const all=[];
+  for(const it of ITEMS){if(!attemptsOf(it.id).length&&!pAtt(it.id).length)continue;const B=blocksOf(it.id);
+    for(let k=0;k<B.length;k++){const M=mistakesOf(it.id,k);if(M)for(const c of M.clusters)all.push({it,k,M,c})}}
+  const nRep=all.filter(x=>x.c.status==='rep').length,nFix=all.filter(x=>x.c.status==='fixed').length,nRec=new Set(all.map(x=>x.it.id)).size;
+  const f=C.errF||'rep',sort=C.errSort||'count';
+  let L=all.filter(x=>f==='all'?true:x.c.status===f);
+  const ord=Object.fromEntries(ITEMS.map((i,n)=>[i.id,n]));
+  L.sort(sort==='recent'?(a,b)=>b.c.lastTs-a.c.lastTs:sort==='order'?(a,b)=>ord[a.it.id]-ord[b.it.id]||a.k-b.k||a.c.s-b.c.s:(a,b)=>b.c.count-a.c.count||(b.c.streak===0)-(a.c.streak===0)||b.c.lastTs-a.c.lastTs);
+  let h=`<div class="card"><h2>間違いノート</h2><p class="sub" style="margin-top:0">練習・圧迫暗記で採点するたびに、正解と比べて<b>どこを・どう書き間違えたか</b>を区切りごとに記録しています（v2.4以降の採点から）。
+   同じ箇所を2回以上間違えたものを「くり返し中」、そのあと2回続けて正しく書けたものを「直ってきた」としています。「読む」画面でも、間違えた所に色がつきます。</p>
+   <div class="stats"><div class="stat"><span class="sub">くり返し中</span><b class="ng">${nRep}</b></div><div class="stat"><span class="sub">直ってきた</span><b class="ok">${nFix}</b></div>
+   <div class="stat"><span class="sub">記録のある理論</span><b>${nRec}</b></div><div class="stat"><span class="sub">間違えた箇所（1回を含む）</span><b>${all.length}</b></div></div>
+   <div class="row" style="margin-top:10px"><div class="seg">${[['rep','くり返し中'],['fixed','直ってきた'],['once','1回だけ'],['all','すべて']].map(([k,l])=>`<button class="${f===k?'on':''}" onclick="C.errF='${k}';saveConf();draw(1)">${l}</button>`).join('')}</div>
+   <div class="seg">${[['count','回数順'],['recent','新しい順'],['order','教科書順']].map(([k,l])=>`<button class="${sort===k?'on':''}" onclick="C.errSort='${k}';saveConf();draw(1)">${l}</button>`).join('')}</div>
+   <span class="grow"></span>${all.length?`<button class="b s" onclick="exportErrCSV()">CSVで書き出す</button>`:''}${L.length?`<button class="b s p" onclick="startQueue(${esc(JSON.stringify([...new Set(L.map(x=>x.it.id))].slice(0,20)))})">この一覧の理論を練習</button>`:''}</div></div>`;
+  if(!all.length)return h+`<div class="card empty">まだ記録がありません。練習か圧迫暗記で採点すると、ここに間違えた箇所がたまっていきます。</div>`;
+  if(!L.length)return h+`<div class="card empty">該当する箇所はありません。</div>`;
+  h+=`<div class="card"><p class="sub" style="margin-top:0">正＝正しい文（<mark>色</mark>の所を間違えた）／誤＝あなたが書いた文（<span style="background:var(--miss);padding:0 3px">赤</span>＝書けなかった字、<span style="background:var(--extra);text-decoration:line-through;padding:0 3px">灰</span>＝余分に書いた字）。●は直近の記録（赤＝この箇所を間違えた、緑＝正しく書けた）</p>`;
+  L.slice(0,150).forEach(({it,k,M,c},n)=>{const b=blocksOf(it.id)[k];
+    h+=`<div class="erow"><div class="row"><div class="grow"><b>${it.q}〔${it.no}〕</b> ${esc(it.title)} <span class="sub">区切り${k+1}${b&&b.h?' '+esc(b.h):''}</span></div>
+      <span class="pill ${c.status==='fixed'?'':c.count>=2?'ng':'w'}">${c.count}回</span>${histDots(c)}${c.ai?' <span class="pill ng">意味が変わる</span>':''}</div>
+     <div class="ecor">正：${corWin(M,c)}</div>
+     ${c.vars.slice(0,3).map(v=>`<div class="evar">誤：<span class="diff inl">${varHTML(M,c,v.w)}</span> <span class="sub">×${v.n}</span></div>`).join('')}
+     <div class="row" style="margin-top:4px"><span class="sub grow">最後に間違えた日 ${c.lastDate.slice(5)}${c.streak?`・その後${c.streak}回続けて正しく書けた`:''}</span>
+      <button class="b s" onclick="openRead('${it.q}','${it.id}')">読む</button><button class="b s" onclick="errKinki('${it.id}',${k},${c.s})">禁忌に登録</button><button class="b s p" onclick="startQueue(['${it.id}'])">練習</button></div></div>`});
+  return h+`${L.length>150?`<p class="sub">ほか ${L.length-150} 件</p>`:''}</div>`}
+function errKinki(id,k,s){const M=mistakesOf(id,k),c=M&&M.clusters.find(x=>x.s===s);if(!c)return;
+  const cor=M.T.slice(Math.max(c.ws,c.s-3),Math.min(c.we,c.e+3)),wr=c.vars[0]?c.vars[0].w:'';
+  const txt=prompt('この理論の禁忌事項として登録します（AI判定がこの誤りを必ずチェックします）',`「${cor}」を「${wr}」と書かない（くり返し間違えている）`);if(!txt)return;
+  S.kinki[uid()]={scope:id,text:txt.trim(),u:now()};saveState();toast('禁忌事項に登録しました')}
+function exportErrCSV(){const rows=[['日付','種類','問題','区分','理論','区切り','見出し','正しい文','書いた文','この箇所を間違えた回数','状態']];
+  for(const it of ITEMS){const B=blocksOf(it.id);for(let k=0;k<B.length;k++){const M=mistakesOf(it.id,k);if(!M)continue;
+    for(const c of M.clusters){const byA={};c.occ.forEach(o=>(byA[o.ai]=byA[o.ai]||[]).push(o));
+      for(const ai in byA){const o=byA[ai][0];rows.push([o.date,o.src,it.q,it.no,it.title,k+1,B[k].h||'',M.T.slice(c.ws,c.we),writtenWin(M.T,c.ws,c.we,byA[ai]),c.count,{rep:'くり返し中',fixed:'直ってきた',once:'1回'}[c.status]])}}}}
+  dl(`間違いの記録_${TODAY()}.csv`,'﻿'+rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\r\n'),'text/csv')}
 
 /* ---------- 起動 ---------- */
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});

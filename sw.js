@@ -1,4 +1,4 @@
-const CACHE='anki-shohi-v2.3';
+const CACHE='anki-shohi-v2.4';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./apple-touch-icon.png'];
 // インストール時はブラウザのHTTPキャッシュを使わず、必ずサーバーから最新を取り直す
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS.map(u=>new Request(u,{cache:'reload'})))));self.skipWaiting()});
