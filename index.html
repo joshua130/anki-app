@@ -230,7 +230,7 @@ function headParts(h){if(!h)return null;const m=h.match(/^([⑴-⒇])[\s　]*(.*
 const memHead=()=>S.settings.memHead!==false;
 function tgt(b){const p=headParts(b.h);return memHead()&&p&&p.label?p.label+'\n'+b.t:b.t}
 function headHTML(b){if(!b.h)return '（本文）';if(!memHead())return esc(b.h);const p=headParts(b.h);
-  const no=p.no?'（'+(p.no.charCodeAt(0)-0x2473)+'）':'';return no+(p.label?' <span class="sub">見出しから書く</span>':'')}
+  return p.no?'（'+(p.no.charCodeAt(0)-0x2473)+'）':(p.label?'（見出し）':'')}
 function headLabel(b){const p=headParts(b.h);return memHead()&&p&&p.label?p.label:''}
 function charsOf(id){return blocksOf(id).reduce((s,b)=>s+norm(tgt(b)).length,0)}
 function mySpeed(){const v=Object.values(ATT).flat().map(speedOf).filter(x=>x);if(v.length<3)return S.settings.targetSpeed;v.sort((a,b)=>a-b);return v[Math.floor(v.length/2)]}
@@ -401,7 +401,7 @@ function draw(keepScroll){nav();drawSync();const m=document.getElementById('main
   const y=window.scrollY;
   m.innerHTML=pr?vPress():run?vRun():tab==='map'?vMap():tab==='today'?vToday():tab==='read'?(rd?vRead():vReadList()):tab==='press'?vPList():tab==='err'?vErr():tab==='plan'?vPlan():tab==='log'?vLog():tab==='kinki'?vKinki():vSet();
   if(pr){if(pr.ph==='test'){const t=document.getElementById('phead')||document.getElementById('pans');if(t)t.focus({preventScroll:true})}else if(pr.ph!=='study')focusNext();ptick()}
-  else if(run){const t=document.getElementById('ans');if(t)t.focus({preventScroll:true});timerSync()}
+  else if(run){const hh=document.getElementById('hans'),t=hh&&!run.hdraft?hh:document.getElementById('ans');if(t)t.focus({preventScroll:true});timerSync()}
   if(run||pr)saveSusp();
   if(!run&&!pr&&tab==='read'&&rd&&rd.jump){const el=document.getElementById('sec-'+rd.jump);rd.jump=null;
     if(el){window.scrollTo(0,el.getBoundingClientRect().top+window.scrollY-document.querySelector('header').offsetHeight-8);return}}
@@ -530,7 +530,8 @@ function vRun(){
     const M0=mistakesOf(run.id,run.i),nr=M0?M0.clusters.filter(c=>c.status==='rep').length:0;
     h+=`${kk.length?`<div class="kinki"><b>この理論の禁忌：</b>${kk.map(k=>esc(k.text)).join('／')}</div>`:''}${nr?`<p class="sub ng" style="margin:4px 0">この区切りには、くり返し間違えている箇所が ${nr} か所あります（採点後に表示します）</p>`:''}
     <div class="row" style="margin-bottom:6px"><span id="tmr" class="timer"></span></div>
-    <textarea id="ans" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="覚えた内容を入力" oninput="run.draft=this.value;touch();suspSoon()" oncompositionupdate="touch()" onkeydown="touch();if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();grade()}">${esc(run.draft)}</textarea>
+    ${headLabel(b)?`<div class="field" style="margin-top:0"><label>見出し</label><input type="text" id="hans" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" value="${esc(run.hdraft||'')}" placeholder="見出しを入力（例：課税の対象）" oninput="run.hdraft=this.value;touch();suspSoon()" onkeydown="touch();if(event.isComposing)return;if(event.key==='Enter'){event.preventDefault();if(event.ctrlKey||event.metaKey)grade();else document.getElementById('ans').focus()}"></div><label class="sub">本文</label>`:''}
+    <textarea id="ans" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="${headLabel(b)?'本文を入力':'覚えた内容を入力'}" oninput="run.draft=this.value;touch();suspSoon()" oncompositionupdate="touch()" onkeydown="touch();if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();grade()}">${esc(run.draft)}</textarea>
     ${run.hint?`<div class="hint">ヒント：${esc(norm(tgt(b)).slice(0,run.hint))}…</div>`:''}${run.peek?`<div class="answer" style="margin-top:8px">${spanHTML(tgt(b),errCls(tgt(b),mistakesOf(run.id,run.i)))}</div>`:''}
     <div class="row" style="margin-top:10px"><button class="b p" onclick="grade()">採点 <kbd>Ctrl/⌘+Enter</kbd></button><button class="b" onclick="run.hint+=10;draw()">ヒント</button>
     <button class="b" onclick="run.peek=!run.peek;draw()">${run.peek?'正解を隠す':'正解を見る'}</button><span class="grow"></span><button class="b s" onclick="run.edit=true;draw()">正解テキストを編集</button></div>
@@ -542,10 +543,12 @@ function vRun(){
      所要時間 <b>${fmtSec(g.sec)}</b>（正しく書けた字で ${g.sec>0?Math.round(g.match/(g.sec/60)):'–'}字/分・目標 ${S.settings.targetSpeed}字/分）${g.sec>0&&g.acc>=S.settings.threshold&&g.match/(g.sec/60)<S.settings.targetSpeed*.75?' <span class="slow">遅</span>':''}</span><span class="grow"></span>
      <button class="b s" onclick="g_flip()">${pass?'×にする':'○にする'}</button></div>
      <div class="sub" style="margin-bottom:6px"><span style="background:var(--miss);padding:0 4px">赤＝書けなかった</span>　<span style="background:var(--extra);text-decoration:line-through;padding:0 4px">灰＝余分</span></div>
+     ${g.hd?`<div style="margin-bottom:6px">見出し：${g.hd.miss||g.hd.extra?'<span class="ng">×</span>':'<span class="ok">○</span>'} 正解「${esc(headLabel(b))}」${g.hd.miss||g.hd.extra?`／あなた「${esc(g.hin)||'（空欄）'}」`:''}</div>`:''}
      <div class="diff">${renderDiff(g.ops)}</div>${recurHTML(run.id,run.i,g)}${vAI(g)}
      <details style="margin-top:8px"><summary>自分の解答</summary><div class="answer">${esc(g.input)}</div></details>
      <div class="row" style="margin-top:12px"><button class="b p" id="nx" onclick="next()" ${g.aiState==='pending'?'disabled':''}>${run.i+1<B.length?'次の区切りへ':'この理論の結果を記録'} <kbd>Enter</kbd></button>
-     ${g.aiState==='pending'?`<button class="b" onclick="g_skipAI()">AI判定を待たずに進む</button>`:''}<button class="b" onclick="retry()">やり直す</button></div>`;
+     ${g.aiState==='pending'?`<button class="b" onclick="g_skipAI()">AI判定を待たずに進む</button>`:''}<button class="b" onclick="retry()">やり直す</button><span class="grow"></span><button class="b s" onclick="editBlock(run.id,run.i)">正解テキストを修正</button></div>
+     ${g.regraded?`<p class="sub">修正した正解テキストで採点し直しました。</p>`:''}`;
   }
   return h+`</div>`;
 }
@@ -566,8 +569,8 @@ function vAI(g){
 const aiCE=a=>(a.critical_errors||[]).slice(0,5).map(e=>[String(e.correct||'').slice(0,40),String(e.written||'').slice(0,40)]);
 function passOf(g){if(g.manual!=null)return g.manual;if(g.helped)return false;if(g.acc<S.settings.threshold)return false;
   if(g.ai&&(!g.ai.meaning_ok||g.ai.kinki_violations.length))return false;return true}
-function grade(){const b=blocksOf(run.id)[run.i],input=run.draft||'';tick();TM.on=false;
-  const T=norm(tgt(b)),d=withErr(diff(T,norm(input)),T);run.graded={...d,input,sec:TM.ms/1000,helped:run.hint>0||run.peek,ai:null,aiState:aiReady()?'pending':'off',manual:null};
+function grade(){const b=blocksOf(run.id)[run.i],hl=headLabel(b),input=hl?(run.hdraft||'')+'\n'+(run.draft||''):(run.draft||'');tick();TM.on=false;
+  const T=norm(tgt(b)),d=withErr(diff(T,norm(input)),T),hd=hl?diff(norm(hl),norm(run.hdraft||'')):null;run.graded={...d,input,hd,hin:hl?run.hdraft||'':null,body:run.draft||'',sec:TM.ms/1000,helped:run.hint>0||run.peek,ai:null,aiState:aiReady()?'pending':'off',manual:null};
   draw();if(run.graded.aiState==='pending')runAI();else focusNext()}
 function focusNext(){setTimeout(()=>{const n=document.getElementById('nx');n&&n.focus({preventScroll:true})},0)}
 /* 採点中の区切り（通常の練習／圧迫暗記のどちらか） */
@@ -577,14 +580,14 @@ function runAI(){const R=pr||run,g=curG(),it=BYID[R.id],b=blocksOf(R.id)[R.i];g.
    .catch(e=>{if(curG()===g){g.aiState='error';g.aiErr=e.message;draw(1)}})}
 function g_skipAI(){curG().aiState='skip';draw(1);focusNext()}
 function g_flip(){const g=curG();g.manual=!passOf(g);draw(1)}
-function retry(){run.draft=run.graded.input;run.graded=null;draw()}
+function retry(){const g=run.graded;if(g.hin!=null){run.hdraft=g.hin;run.draft=g.body||''}else run.draft=g.body!=null?g.body:g.input;run.graded=null;draw()}
 function regKinki(k,scope){const R=pr||run,e=curG().ai.critical_errors[k];
   const txt=prompt('禁忌事項として登録する内容（編集できます）',`「${e.correct}」を「${e.written}」と書かない（${e.reason}）`);if(!txt)return;
   S.kinki[uid()]={scope:scope==='g'?'g':R.id,text:txt.trim(),u:now()};saveState();toast('禁忌事項に登録しました')}
 function next(){const g=run.graded;if(!g||g.aiState==='pending')return;
   run.res.push({acc:Math.round(g.acc*10)/10,pass:passOf(g),n:g.n,m:g.match,sec:Math.round(g.sec),helped:g.helped,...errRec(g),
     ai:g.ai?{ok:g.ai.meaning_ok,score:g.ai.meaning_score,crit:g.ai.critical_errors.length,kinki:g.ai.kinki_violations.map(k=>k.rule),ce:aiCE(g.ai)}:null});
-  run.i++;run.graded=null;run.hint=0;run.peek=false;run.draft='';TM.ms=0;TM.on=false;if(run.i>=blocksOf(run.id).length)record();draw()}
+  run.i++;run.graded=null;run.hint=0;run.peek=false;run.draft='';run.hdraft='';TM.ms=0;TM.on=false;if(run.i>=blocksOf(run.id).length)record();draw()}
 function record(){const tot=run.res.reduce((s,r)=>s+r.n,0)||1,acc=run.res.reduce((s,r)=>s+r.acc*r.n,0)/tot,pass=run.res.every(r=>r.pass),t=TODAY(),u=uid();
   const sec=run.res.reduce((s,r)=>s+(r.sec||0),0);
   S.attempts[u]={uid:u,ts:now(),date:t,id:run.id,acc:Math.round(acc*10)/10,pass,sec,dev:C.device||'',blocks:run.res};
@@ -697,7 +700,8 @@ function vPress(){const it=BYID[pr.id],B=blocksOf(pr.id),spc=PLV[pr.lv];
    ${g.hd?`<div style="margin-bottom:6px">見出し：${g.hd.miss||g.hd.extra?'<span class="ng">×</span>':'<span class="ok">○</span>'} 正解「${esc(headLabel(b))}」${g.hd.miss||g.hd.extra?`／あなた「${esc(g.hin)||'（空欄）'}」`:''}</div>`:''}
    <div class="diff">${renderDiff(g.ops)}</div>${recurHTML(pr.id,pr.i,g)}${vAI(g)}
    <div class="row" style="margin-top:12px"><button class="b p" id="nx" onclick="pNext()" ${g.aiState==='pending'?'disabled':''}>${pr.i+1<B.length?'次の区切りへ（すぐ表示が始まります）':'結果を記録'} <kbd>Enter</kbd></button>
-   ${g.aiState==='pending'?`<button class="b" onclick="g_skipAI()">AI判定を待たずに進む</button>`:''}</div></div>`}
+   ${g.aiState==='pending'?`<button class="b" onclick="g_skipAI()">AI判定を待たずに進む</button>`:''}<span class="grow"></span><button class="b s" onclick="editBlock(pr.id,pr.i)">正解テキストを修正</button></div>
+   ${g.regraded?`<p class="sub">修正した正解テキストで採点し直しました。</p>`:''}</div>`}
 function vPDone(){const a=pr.rec,more=pr.qi+1<pr.queue.length,nl=pLevel(pr.id),ez=easeOf(pr.id);
   return `<div class="row" style="margin:14px 0"><span class="big ${a.pass?'ok':'ng'}">${a.pass?'○ 合格':'× 不合格'}</span><span class="big">${pct(a.acc)}</span>
    <span class="sub">${a.spc.toFixed(1)}秒/字・覚えた時間 ${fmtSec(a.study)}・テスト ${fmtSec(a.test)}</span></div>
@@ -924,7 +928,7 @@ function vSet(){const st=S.settings;
   <div class="row"><label class="b">理論データ／解説データ／バックアップを読み込む<input type="file" accept=".json,application/json" style="display:none" onchange="importData(this.files[0])"></label>
   <button class="b" onclick="exportJSON()">記録のバックアップ（JSON）</button><button class="b" onclick="exportCSV()">練習履歴をCSVで書き出す</button></div>
   <p class="sub">旧版（HTMLファイル版）で書き出したバックアップJSONも読み込めます。</p></div>
-  <div class="card sub">消費税法 理論暗記 v2.4</div>`}
+  <div class="card sub">消費税法 理論暗記 v2.6</div>`}
 function setS(k,v){S.settings[k]=v;S.settings.u=now();saveState()}
 function saveAI(){C.apiKey=document.getElementById('ak').value.trim();C.model=document.getElementById('am').value;C.aiOn=document.getElementById('ao').checked;saveConf();toast('保存しました')}
 async function testAI(){saveAI();const el=document.getElementById('aitest');el.innerHTML='<span class="spin"></span> テスト中…';
@@ -953,9 +957,9 @@ function importBackup(d){if(!confirm('バックアップの記録を現在の記
    ========================================================= */
 function runSnap(){if(!run||!BYID[run.id])return null;const n=blocksOf(run.id).length;
   if(run.i>=n){const qi=run.qi+1;return qi<run.queue.length?{queue:run.queue,qi,id:run.queue[qi],i:0,res:[],graded:null,hint:0,peek:false,draft:'',tm:0}:null}
-  if(!(run.i>0||run.res.length||run.graded||(run.draft||'').trim()||run.qi>0))return null;
+  if(!(run.i>0||run.res.length||run.graded||(run.draft||'').trim()||(run.hdraft||'').trim()||run.qi>0))return null;
   const g=run.graded?{...run.graded,...(run.graded.aiState==='pending'?{aiState:'error',aiErr:'中断したためAI判定が終わっていません'}:{})}:null;
-  return {queue:run.queue,qi:run.qi,id:run.id,i:run.i,res:run.res,graded:g,hint:run.hint,peek:run.peek,draft:run.draft||'',tm:g?0:TM.ms}}
+  return {queue:run.queue,qi:run.qi,id:run.id,i:run.i,res:run.res,graded:g,hint:run.hint,peek:run.peek,draft:run.draft||'',hdraft:run.hdraft||'',tm:g?0:TM.ms}}
 function prSnap(){if(!pr||!BYID[pr.id])return null;
   if(pr.ph==='done'){const qi=pr.qi+1;return qi<pr.queue.length?{queue:pr.queue,qi,...pNew(pr.queue[qi])}:null}
   if(!(pr.i>0||pr.res.length||pr.ph!=='ready'||pr.qi>0))return null;
@@ -1055,7 +1059,7 @@ function vRead(){const qi=QS.findIndex(x=>x.q===rd.q),q=QS[qi];if(!q){rd=null;re
     B.forEach((b,k)=>{const M=C.readErr!==false&&!hide?mistakesOf(it.id,k):null,raw=tgt(b),cls=M?errCls(raw,M):null,hl=headLabel(b),off=hl?hl.length+1:0;
       const hp=headParts(b.h),head=b.h?(cls&&hl?esc(hp.no)+(hp.no?' ':'')+spanHTML(hl,cls,0):esc(b.h)):'';
       const reps=M?M.clusters.filter(c=>c.status==='rep'):[];
-      h+=`<div class="rblk">${head?`<div class="rh">${head}</div>`:''}<div class="rtext${hide?' hid':''}" onclick="this.classList.remove('hid')">${lawHTML(b.t,cls,off)}</div>
+      h+=`<div class="rblk"><div class="row" style="align-items:flex-start"><div class="rh grow">${head}</div><button class="b s" style="min-height:28px;padding:2px 8px;font-size:12px" onclick="editBlock('${it.id}',${k})">修正</button></div><div class="rtext${hide?' hid':''}" onclick="this.classList.remove('hid')">${lawHTML(b.t,cls,off)}</div>
        ${reps.map(c=>`<div class="erep"><span class="pill ng">${c.count}回</span> 正「${corWin(M,c)}」　誤「<span class="diff inl">${varHTML(M,c,c.vars[0].w)}</span>」</div>`).join('')}</div>`});
     if(nm)h+=noteBox(nm[+it.no],'解説');
     h+=`</div>`}
@@ -1192,6 +1196,39 @@ function exportErrCSV(){const rows=[['日付','種類','問題','区分','理論
     for(const c of M.clusters){const byA={};c.occ.forEach(o=>(byA[o.ai]=byA[o.ai]||[]).push(o));
       for(const ai in byA){const o=byA[ai][0];rows.push([o.date,o.src,it.q,it.no,it.title,k+1,B[k].h||'',M.T.slice(c.ws,c.we),writtenWin(M.T,c.ws,c.we,byA[ai]),c.count,{rep:'くり返し中',fixed:'直ってきた',once:'1回'}[c.status]])}}}}
   dl(`間違いの記録_${TODAY()}.csv`,'﻿'+rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\r\n'),'text/csv')}
+
+/* =========================================================
+   正解テキストの修正（v2.5）
+   採点画面・読む画面から、区切りごとの正解テキスト（見出し・本文）を直せる。
+   修正は S.overrides に保存（同期対象）。採点画面で直した場合は、同じ解答・同じ所要時間のまま採点し直す。
+   ========================================================= */
+function editBlock(id,k){const it=BYID[id],b=blocksOf(id)[k];if(!it||!b)return;
+  const orig=BYID[id].blocks[k],changed=orig&&(orig.h!==b.h||orig.t!==b.t);
+  const grading=(run&&run.graded&&run.id===id&&run.i===k)||(pr&&pr.ph==='graded'&&pr.id===id&&pr.i===k);
+  document.getElementById('sheetIn').innerHTML=`<div class="row"><h2 class="grow" style="margin:0">正解テキストを修正</h2><button class="b s" onclick="closeSheet()">閉じる</button></div>
+   <div style="margin:6px 0">${itemLabel(it)}<span class="sub">区切り ${k+1} / ${blocksOf(id).length}</span></div>
+   <p class="sub">PDFから取り込んだときの誤りなどを直せます。修正は他の端末にも同期されます。${grading?'<b>保存すると、いまの解答のまま採点し直します。</b>':''}</p>
+   <div class="field"><label>見出し（例：⑴ 課税の対象。なければ空欄）</label><input type="text" id="ebh" value="${esc(b.h||'')}"></div>
+   <div class="field"><label>本文</label><textarea id="ebt" style="min-height:240px">${esc(b.t)}</textarea></div>
+   ${changed?`<details style="margin:6px 0"><summary>取り込んだときの元のテキスト</summary><div class="answer">${esc((orig.h?orig.h+'\n':'')+orig.t)}</div></details>`:''}
+   <div class="row"><button class="b p" onclick="saveBlockEdit('${id}',${k})">保存${grading?'して採点し直す':''}</button><button class="b" onclick="closeSheet()">キャンセル</button>
+   <span class="grow"></span>${changed?`<button class="b s" onclick="resetBlockEdit('${id}',${k})">元のテキストに戻す</button>`:''}</div>`;
+  document.getElementById('sheet').classList.add('on');setTimeout(()=>{const t=document.getElementById('ebt');t&&t.focus({preventScroll:true})},50)}
+function setBlock(id,k,nb){const B=structuredClone(blocksOf(id));B[k]=nb;
+  const O=BYID[id].blocks,same=B.length===O.length&&B.every((b,i)=>(b.h||null)===(O[i].h||null)&&b.t===O[i].t);
+  S.overrides[id]={blocks:same?null:B,u:now()};saveState()}
+function saveBlockEdit(id,k){const h=document.getElementById('ebh').value.trim()||null,t=document.getElementById('ebt').value.replace(/\s+$/,'');
+  if(!t.trim()){toast('本文が空です');return}setBlock(id,k,{h,t});afterBlockEdit(id,k);toast('正解テキストを保存しました')}
+function resetBlockEdit(id,k){if(!confirm('この区切りを取り込んだときの元のテキストに戻しますか？'))return;setBlock(id,k,structuredClone(BYID[id].blocks[k]));afterBlockEdit(id,k)}
+function afterBlockEdit(id,k){document.getElementById('sheet').classList.remove('on');
+  if(run&&run.graded&&run.id===id&&run.i===k)regrade();else if(pr&&pr.ph==='graded'&&pr.id===id&&pr.i===k)regrade();else draw(1)}
+/* 同じ解答・同じ所要時間のまま、修正後の正解で採点し直す */
+function regrade(){
+  if(run&&run.graded){const g=run.graded,b=blocksOf(run.id)[run.i],hl=headLabel(b),T=norm(tgt(b)),d=withErr(diff(T,norm(g.input)),T);
+    run.graded={...g,...d,hd:hl&&g.hin!=null?diff(norm(hl),norm(g.hin)):null,ai:null,aiState:aiReady()?'pending':'off',manual:null,regraded:true};draw(1);if(run.graded.aiState==='pending')runAI();else focusNext();return}
+  if(pr&&pr.ph==='graded'){const g=pr.g,b=blocksOf(pr.id)[pr.i],hl=headLabel(b),T=norm(tgt(b)),d=withErr(diff(T,norm(g.input)),T);
+    const hd=hl?diff(norm(hl),norm(g.hin||'')):null,st=!C.pressAI?'poff':aiReady()?'pending':'off';
+    pr.g={...g,...d,hd,ai:null,aiState:st,manual:null,regraded:true};draw(1);if(st==='pending')runAI();else focusNext()}}
 
 /* ---------- 起動 ---------- */
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
