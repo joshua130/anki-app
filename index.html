@@ -110,6 +110,22 @@ details summary{cursor:pointer;color:var(--sub);font-size:13px}
 .cd{font-size:44px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}.cd.low{color:rgb(var(--r))}
 .studytext{white-space:pre-wrap;word-break:break-all;font-size:18px;line-height:2;background:#fffdf5;border:1px solid var(--line);border-radius:10px;padding:14px;-webkit-user-select:none;user-select:none}
 .bar.cdb i{transition:width .25s linear}
+/* 読む */
+.rsec{scroll-margin-top:80px}
+.rblk{margin:12px 0 4px}
+.rblk .rh{font-weight:700;font-size:16px}
+.rtext{word-break:break-all;font-size:17px;line-height:2;padding:2px 0;border-radius:6px}
+.rtext.hid{color:transparent;background:#ecebe6;cursor:pointer;-webkit-user-select:none;user-select:none}
+.rtext.hid::after{content:'タップで表示';color:var(--sub);font-size:12px}
+.note{border:1px solid var(--line);border-left:4px solid var(--brand);background:#fbfcfa;border-radius:8px;padding:8px 12px;margin-top:12px}
+.note summary{font-weight:700;color:var(--brand);font-size:14px;padding:4px 0}
+.note h4{margin:14px 0 4px;font-size:14px;line-height:1.6}
+.note p{margin:3px 0;font-size:15px;line-height:1.9;text-indent:1em}
+.note p.ni{text-indent:0}
+.note .lab{display:inline-block;font-size:12px;font-weight:700;color:var(--brand);border:1px solid var(--brand);border-radius:4px;padding:0 6px;margin:10px 0 2px}
+.note img{display:block;max-width:100%;height:auto;margin:6px 0;background:#fff}
+.susp{border-color:var(--warn);background:#fffaf0}
+
 </style>
 </head>
 <body>
@@ -125,7 +141,9 @@ details summary{cursor:pointer;color:var(--sub);font-size:13px}
    - anki2-state  : 記録（同期対象）
    - anki2-config : APIキー・トークンなど端末ローカルの設定（同期しない）
    ========================================================= */
-const K_DATA='anki2-data',K_STATE='anki2-state',K_CONF='anki2-config';
+const K_DATA='anki2-data',K_STATE='anki2-state',K_CONF='anki2-config',K_SUSP='anki2-susp';
+/* - anki2-susp   : 中断中の練習・圧迫暗記（端末ローカル。続きから再開するため）
+   - IndexedDB anki2/kv 'notes' : 解説データ（要旨・内容解説。図を含み大きいため localStorage ではなく IndexedDB） */
 const ld=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}};
 const sv=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){toast('保存に失敗しました: '+e.message);return false}};
 const now=()=>Date.now();
@@ -150,6 +168,13 @@ const DEF_SET={threshold:90,ignorePunct:false,ignoreMarks:true,showHead:true,mem
 S.settings=Object.assign({},DEF_SET,S.settings);S.schedule=S.schedule||null;S.pressure=S.pressure||{};
 let C=Object.assign({model:'claude-sonnet-5-5',aiOn:true,apiKey:'',ghOwner:'',ghRepo:'',ghToken:'',device:'',view:'q',pressAI:false,pSort:'hard'},ld(K_CONF,{}));
 let ITEMS=[],BYID={},QS=[],ATT={};
+let SUSP=ld(K_SUSP,{});
+/* ---------- IndexedDB（解説データ用） ---------- */
+const IDB={p:null,open(){return this.p||(this.p=new Promise((res,rej)=>{const r=indexedDB.open('anki2',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}))},
+  async get(k){const db=await this.open();return new Promise((res,rej)=>{const q=db.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})},
+  async set(k,v){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})}};
+let NOTES=null,notesLoaded=false;
+async function setNotes(n){NOTES=n;await IDB.set('notes',n)}
 function setData(d){DATA=d;ITEMS=d?d.items:[];BYID=Object.fromEntries(ITEMS.map(i=>[i.id,i]));
   const seen={};QS=[];ITEMS.forEach(i=>{if(!seen[i.q]){seen[i.q]={q:i.q,qt:i.qt,ch:i.ch,items:[]};QS.push(seen[i.q])}seen[i.q].items.push(i)})}
 setData(DATA);
@@ -324,11 +349,28 @@ async function syncNow(manual){
     else if(remT.text){const RD=JSON.parse(remT.text);
       if(!DATA||(RD.updated||0)>(DATA.updated||0)){setData(RD);sv(K_DATA,RD);toast('理論データを同期しました')}
       else if((DATA.updated||0)>(RD.updated||0)){await ghPut('theory.json',JSON.stringify(DATA),remT.sha,'update theory data')}}
+    await syncNotes(manual);
     syncState={t:now(),err:''};if(manual)toast('同期しました');
-    if(!run)draw();
+    if(!run&&!pr)draw(1);
   }catch(e){syncState.err=e.message;if(manual)toast('同期エラー: '+e.message)}
   finally{syncing=false;drawSync()}
 }
+/* 解説データ（notes.json, 約6MB）：GitHub上のファイルが変わったときだけダウンロードする */
+async function ghSha(path){const r=await fetch(`https://api.github.com/repos/${encodeURIComponent(C.ghOwner)}/${encodeURIComponent(C.ghRepo)}/contents/${path}`,
+  {headers:{'Authorization':'Bearer '+C.ghToken,'Accept':'application/vnd.github.object+json','X-GitHub-Api-Version':'2022-11-28'},cache:'no-store'});
+  if(r.status===404)return null;if(!r.ok)throw new Error('GitHub '+r.status);return (await r.json()).sha}
+async function ghPutSha(path,text,sha,msg){const r=await gh(path,{method:'PUT',body:JSON.stringify({message:msg,content:b64e(text),...(sha?{sha}:{})})});
+  if(!r.ok)throw new Error('GitHub '+r.status);const j=await r.json();return j.content&&j.content.sha}
+async function syncNotes(manual){if(!notesLoaded)return;
+  if(!manual&&C.notesFail&&now()-C.notesFail<6*3600e3)return;   // 失敗したら6時間は自動では再試行しない（大きいファイルのため）
+  try{const sha=await ghSha('notes.json');
+    if(!sha){if(NOTES){C.notesSha=await ghPutSha('notes.json',JSON.stringify(NOTES),null,'upload notes');saveConf()}return}
+    if(sha===C.notesSha)return;
+    const rr=await gh('notes.json',{raw:true});if(!rr.ok)throw new Error('GitHub '+rr.status);const RN=JSON.parse(await rr.text());
+    if(!NOTES||(RN.updated||0)>=(NOTES.updated||0)){await setNotes(RN);C.notesSha=sha;saveConf();toast('解説データを同期しました')}
+    else{C.notesSha=await ghPutSha('notes.json',JSON.stringify(NOTES),sha,'update notes');saveConf()}
+    if(C.notesFail){C.notesFail=0;saveConf()}
+  }catch(e){C.notesFail=now();saveConf();if(manual)toast('解説データの同期に失敗しました（'+e.message+'）。各端末で「解説データ.json」を読み込んでも使えます')}}
 function drawSync(){const el=document.getElementById('sync');if(!ghReady()){el.textContent='同期：未設定';el.className='';return}
   if(syncing){el.innerHTML='<span class="spin"></span> 同期中';el.className='';return}
   if(syncState.err){el.textContent='同期エラー（タップで再試行）';el.className='err';return}
@@ -339,18 +381,21 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 /* =========================================================
    画面
    ========================================================= */
-let tab='map',run=null,pr=null;
-const TABS=[['map','マップ'],['today','今日の暗記'],['press','圧迫暗記'],['plan','スケジュール'],['log','記録'],['kinki','禁忌事項'],['set','設定']];
+let tab='map',run=null,pr=null,rd=null;
+const TABS=[['map','マップ'],['today','今日の暗記'],['read','読む'],['press','圧迫暗記'],['plan','スケジュール'],['log','記録'],['kinki','禁忌事項'],['set','設定']];
 function nav(){document.getElementById('nav').innerHTML=TABS.map(([k,v])=>`<button class="${tab===k&&!run&&!pr?'on':''}" onclick="go('${k}')">${v}</button>`).join('')}
-function go(k){if(run&&run.res.length<blocksOf(run.id).length&&(run.res.length||run.graded)&&!confirm('練習を中断しますか？（この理論の途中経過は記録されません）'))return;
-  if(pr&&pr.ph!=='ready'&&pr.ph!=='done'&&!confirm('圧迫暗記を中断しますか？（この理論の途中経過は記録されません）'))return;
-  run=null;TM.on=false;TM.ms=0;pr=null;PT.on=false;tab=k;draw()}
+/* 練習・圧迫暗記の途中で別の画面へ移るときは、途中経過を保存しておく（「続きから再開」で戻れる） */
+function leaveSession(){if((run||pr)&&saveSusp())toast('途中経過を保存しました。「続きから再開」で戻れます');run=null;TM.on=false;TM.ms=0;pr=null;PT.on=false}
+function go(k){leaveSession();rd=null;tab=k;draw()}
 function draw(keepScroll){nav();drawSync();const m=document.getElementById('main');
   if(!DATA&&tab!=='set'){m.innerHTML=vNoData();return}
   const y=window.scrollY;
-  m.innerHTML=pr?vPress():run?vRun():tab==='map'?vMap():tab==='today'?vToday():tab==='press'?vPList():tab==='plan'?vPlan():tab==='log'?vLog():tab==='kinki'?vKinki():vSet();
+  m.innerHTML=pr?vPress():run?vRun():tab==='map'?vMap():tab==='today'?vToday():tab==='read'?(rd?vRead():vReadList()):tab==='press'?vPList():tab==='plan'?vPlan():tab==='log'?vLog():tab==='kinki'?vKinki():vSet();
   if(pr){if(pr.ph==='test'){const t=document.getElementById('phead')||document.getElementById('pans');if(t)t.focus({preventScroll:true})}else if(pr.ph!=='study')focusNext();ptick()}
   else if(run){const t=document.getElementById('ans');if(t)t.focus({preventScroll:true});timerSync()}
+  if(run||pr)saveSusp();
+  if(!run&&!pr&&tab==='read'&&rd&&rd.jump){const el=document.getElementById('sec-'+rd.jump);rd.jump=null;
+    if(el){window.scrollTo(0,el.getBoundingClientRect().top+window.scrollY-document.querySelector('header').offsetHeight-8);return}}
   if(keepScroll)window.scrollTo(0,y);else window.scrollTo(0,0)}
 function vNoData(){return `<div class="card"><h2>はじめに：理論データの読み込み</h2>
  <p>理論テキストから作成した <b>理論データ.json</b> を読み込んでください。</p>
@@ -358,6 +403,7 @@ function vNoData(){return `<div class="card"><h2>はじめに：理論データ�
  <button class="b" onclick="go('set')">同期を設定する（他の端末で読み込み済みの場合）</button></div>
  <p class="sub">理論データは著作物を含むため、アプリの公開サーバーには置かず、この端末と（設定した場合は）あなた専用の非公開リポジトリにだけ保存されます。</p></div>`}
 function importData(f){if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);
+  if(d.format==='anki-shohi-notes'&&d.notes){d.updated=d.updated||now();setNotes(d).then(()=>{toast(`解説データ（${Object.keys(d.notes).length}問題分）を読み込みました`);C.notesSha='';saveConf();scheduleSync();draw(1)}).catch(e=>toast('解説データを保存できませんでした: '+e.message));return}
   if(d.format==='anki-shohi-data'&&Array.isArray(d.items)){d.updated=d.updated||now();setData(d);sv(K_DATA,d);toast(`理論 ${d.items.length} 件を読み込みました`);scheduleSync();tab='map';draw()}
   else if(d.attempts){importBackup(d)}else throw 0}catch(e){toast('読み込めませんでした')}};r.readAsText(f)}
 
@@ -371,6 +417,7 @@ function vMap(){
   const p=new Set(planOf());let h=`<div class="card"><div class="row"><div class="seg"><button class="${C.view==='q'?'on':''}" onclick="C.view='q';saveConf();draw(1)">問題ごと（1-1, 1-2…）</button><button class="${C.view==='s'?'on':''}" onclick="C.view='s';saveConf();draw(1)">セクションごと（〔1〕〔2〕…）</button></div>
    <span class="grow"></span><span class="sub">今日の予定 ${p.size}件</span><button class="b s p" onclick="go('today')">今日の暗記へ</button></div>
    <div style="margin-top:10px">${legend()}</div></div>`;
+  h=vSuspCards()+h;
   let lastCh='';
   if(C.view==='q'){
     h+=`<div class="card">`;
@@ -397,13 +444,14 @@ function openQ(qid,focus){const q=QS.find(x=>x.q===qid),p=new Set(planOf());
   let h=`<div class="row"><h2 class="grow" style="margin:0">問題 ${q.q}　${esc(q.qt)}</h2><button class="b s" onclick="closeSheet()">閉じる</button></div>
   <div class="row" style="margin:10px 0"><button class="b p" onclick="closeSheet();startQueue(${esc(JSON.stringify(q.items.map(i=>i.id)))})">この問題を通しで練習</button>
   <button class="b" onclick="closeSheet();pQueue(${esc(JSON.stringify(q.items.map(i=>i.id)))})">この問題を圧迫暗記</button>
+  <button class="b" onclick="closeSheet();openRead('${q.q}')">条文と解説を読む</button>
   <button class="b" onclick="addPlan(${esc(JSON.stringify(q.items.map(i=>i.id)))});openQ('${qid}')">全セクションを今日に追加</button></div>
   <table><tr><th></th><th>セクション</th><th class="n">最新</th><th class="n hide-sm">実施日</th><th class="n hide-sm">次回</th><th></th></tr>`;
   for(const i of q.items){const st=itemStatus(i.id),t=toneStyle(st),s=srsOf(i.id),n=attemptsOf(i.id).length;
     h+=`<tr style="${focus===i.id?'background:var(--brands)':''}"><td><span class="sw" style="${t.style}"></span></td>
     <td>〔${i.no}〕 ${esc(i.title)} ${stars(i.stars)}${kinkiFor(i.id).some(k=>k.scope!=='g')?' <span class="pill ng">禁忌あり</span>':''}<div class="sub">${n?`${n}回練習`:'未実施'}${pAtt(i.id).length?`・圧迫${pAtt(i.id).length}回 ${Math.round(easeOf(i.id))}字/分 ${ezTag(easeClass(i.id))}`:''}</div></td>
     <td class="n">${st?`<span class="${st.pass?'ok':'ng'}">${pct(st.acc)}</span>`:'–'}</td><td class="n hide-sm sub">${st?st.date.slice(5):''}</td><td class="n hide-sm sub">${s?s.due.slice(5):''}</td>
-    <td class="n"><button class="b s p" onclick="closeSheet();startQueue(['${i.id}'])">練習</button><button class="b s" onclick="closeSheet();pQueue(['${i.id}'])">圧迫</button>
+    <td class="n"><button class="b s" onclick="closeSheet();openRead('${q.q}','${i.id}')">読む</button><button class="b s p" onclick="closeSheet();startQueue(['${i.id}'])">練習</button><button class="b s" onclick="closeSheet();pQueue(['${i.id}'])">圧迫</button>
     <button class="b s" onclick="togglePlan('${i.id}');openQ('${qid}','${focus||''}')">${p.has(i.id)?'予定から外す':'今日に追加'}</button></td></tr>`}
   h+=`</table>`;
   document.getElementById('sheetIn').innerHTML=h;document.getElementById('sheet').classList.add('on')}
@@ -417,7 +465,7 @@ function vToday(){
   const t=TODAY(),p=planOf(t).filter(id=>BYID[id]),todayA=Object.values(ATT).flat().filter(a=>a.date===t);
   const done=p.filter(id=>bestOn(id,t)).length,okc=p.filter(id=>{const b=bestOn(id,t);return b&&b.pass}).length;
   const avg=todayA.length?todayA.reduce((s,a)=>s+a.acc,0)/todayA.length:null,due=dueList().filter(id=>!p.includes(id));
-  let h=`<div class="card"><div class="stats"><div class="stat"><span class="sub">今日の予定</span><b>${p.length}</b></div>
+  let h=vSuspCards()+`<div class="card"><div class="stats"><div class="stat"><span class="sub">今日の予定</span><b>${p.length}</b></div>
    <div class="stat"><span class="sub">練習済み</span><b>${done}/${p.length}</b></div><div class="stat"><span class="sub">合格（緑）</span><b>${okc}</b></div>
    <div class="stat"><span class="sub">今日の平均精度</span><b>${pct(avg)}</b></div>
    <div class="stat"><span class="sub">今日の学習時間</span><b>${fmtMin(todayA.reduce((s,a)=>s+(a.sec||0),0)/60)}</b></div>
@@ -429,7 +477,7 @@ function vToday(){
   else{const kd=kindMap(t);h+=`<table><tr><th></th><th>理論</th><th class="n hide-sm">見込み</th><th class="n">今日の最高</th><th class="n hide-sm">前回</th><th></th></tr>`;
     p.forEach((id,i)=>{const it=BYID[id],b=bestOn(id,t),prev=attemptsOf(id).filter(a=>a.date<t).pop(),tn=toneStyle(itemStatus(id));
       h+=`<tr><td><span class="sw" style="${tn.style}"></span></td><td>${kd[id]?kindTag(kd[id]):''}${itemLabel(it)} ${stars(it.stars)}</td><td class="n hide-sm sub">${fmtMin(estFor(id))}</td><td class="n">${b?`<span class="${b.pass?'ok':'ng'}">${pct(b.acc)}</span> <span class="sub">${b.sec?fmtSec(b.sec):""}</span>`:'<span class="sub">未</span>'}</td>
-      <td class="n hide-sm">${prev?pct(prev.acc):'–'}</td><td class="n"><button class="b s p" onclick="startQueue(['${id}'])">練習</button>
+      <td class="n hide-sm">${prev?pct(prev.acc):'–'}</td><td class="n"><button class="b s" onclick="openRead('${it.q}','${id}')">読む</button><button class="b s p" onclick="startQueue(['${id}'])">練習</button>
       <button class="b s" onclick="mvPlan(${i},-1)" ${i?'':'disabled'}>↑</button><button class="b s" onclick="togglePlan('${id}');draw(1)">外す</button></td></tr>`});h+=`</table>`}
   h+=`</div><div class="card"><div class="row"><h2 class="grow">復習候補（復習日が来た理論）</h2>${due.length?`<button class="b s" onclick="addPlan(dueList());draw(1)">すべて追加</button>`:''}</div>
    <p class="sub" style="margin-top:0">合格するごとに次の復習までの間隔が 1→3→7→14→30→60日 と延び、不合格なら翌日に戻ります。正確でも時間がかかった（<span class="slow">遅</span>）場合は間隔を伸ばしません。正確かつ速い場合は一段飛ばします。</p>`;
@@ -456,11 +504,11 @@ function paintTimer(){const el=document.getElementById('tmr');if(!el||!run)retur
 document.addEventListener('visibilitychange',()=>{tick()});
 
 /* ---------- 練習 ---------- */
-function startQueue(ids){if(!ids.length)return;pr=null;PT.on=false;TM.ms=0;TM.on=false;run={queue:ids,qi:0,id:ids[0],i:0,res:[],graded:null,hint:0,peek:false,draft:'',edit:false};draw()}
+function startQueue(ids){if(!ids.length)return;if(!run&&!okNew('run'))return;if(pr)leaveSession();rd=null;pr=null;PT.on=false;TM.ms=0;TM.on=false;run={queue:ids,qi:0,id:ids[0],i:0,res:[],graded:null,hint:0,peek:false,draft:'',edit:false};draw()}
 function vRun(){
   const it=BYID[run.id],B=blocksOf(run.id);if(run.i>=B.length)return vDone();
   const b=B[run.i],g=run.graded,qtxt=run.queue.length>1?`<span class="pill">${run.qi+1} / ${run.queue.length} 理論目</span>`:'';
-  let h=`<div class="card"><div class="row"><div class="grow">${itemLabel(it)}</div>${qtxt}${stars(it.stars)}<button class="b s" onclick="go(tab)">中断</button></div>
+  let h=`<div class="card"><div class="row"><div class="grow">${itemLabel(it)}</div>${qtxt}${stars(it.stars)}<button class="b s" onclick="quitAsk()">中断</button></div>
    <div class="prog">${B.map((_,k)=>`<span class="${k<run.res.length?(run.res[k].pass?'ok':'ng'):k===run.i?'cur':''}"></span>`).join('')}</div>
    <div class="sub">区切り ${run.i+1} / ${B.length}${aiReady()?'　・AI判定オン':C.apiKey&&C.aiOn?'　・オフラインのためAI判定なし':''}</div>
    <div class="prompt">${headHTML(b)}</div>`;
@@ -472,7 +520,7 @@ function vRun(){
     const kk=kinkiFor(run.id).filter(k=>k.scope!=='g');
     h+=`${kk.length?`<div class="kinki"><b>この理論の禁忌：</b>${kk.map(k=>esc(k.text)).join('／')}</div>`:''}
     <div class="row" style="margin-bottom:6px"><span id="tmr" class="timer"></span></div>
-    <textarea id="ans" placeholder="覚えた内容を入力" oninput="run.draft=this.value;touch()" oncompositionupdate="touch()" onkeydown="touch();if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();grade()}">${esc(run.draft)}</textarea>
+    <textarea id="ans" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="覚えた内容を入力" oninput="run.draft=this.value;touch();suspSoon()" oncompositionupdate="touch()" onkeydown="touch();if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();grade()}">${esc(run.draft)}</textarea>
     ${run.hint?`<div class="hint">ヒント：${esc(norm(tgt(b)).slice(0,run.hint))}…</div>`:''}${run.peek?`<div class="answer" style="margin-top:8px">${esc(tgt(b))}</div>`:''}
     <div class="row" style="margin-top:10px"><button class="b p" onclick="grade()">採点 <kbd>Ctrl/⌘+Enter</kbd></button><button class="b" onclick="run.hint+=10;draw()">ヒント</button>
     <button class="b" onclick="run.peek=!run.peek;draw()">${run.peek?'正解を隠す':'正解を見る'}</button><span class="grow"></span><button class="b s" onclick="run.edit=true;draw()">正解テキストを編集</button></div>
@@ -541,7 +589,7 @@ function vDone(){const it=BYID[run.id],s=run.summary,more=run.qi+1<run.queue.len
    ${r.ai?(r.ai.ok?'<span class="pill">意味OK</span>':'<span class="pill ng">意味NG</span>'):''}${r.ai&&r.ai.kinki.length?' <span class="pill ng">禁忌違反</span>':''}${r.helped?' <span class="pill w">ヒント使用</span>':''}</td></tr>`).join('')}</table>
   <p class="sub">次回の復習日：${s.due}（${s.iv}日後）</p><div class="row">
   ${more?`<button class="b p" id="nx" onclick="nextInQueue()">次の理論へ（${run.queue[run.qi+1]}） <kbd>Enter</kbd></button>`:nextToday?`<button class="b p" onclick="startQueue(['${nextToday}'])">今日の次の理論へ（${nextToday}）</button>`:''}
-  <button class="b" onclick="startQueue(['${run.id}'])">もう一度</button><button class="b" onclick="run=null;draw()">戻る</button></div></div>`}
+  <button class="b" onclick="startQueue(['${run.id}'])">もう一度</button><button class="b" onclick="openRead('${it.q}','${run.id}')">条文と解説を読む</button><button class="b" onclick="go(tab)">戻る</button></div></div>`}
 function nextInQueue(){const q=run.queue,qi=run.qi+1;TM.ms=0;TM.on=false;run={queue:q,qi,id:q[qi],i:0,res:[],graded:null,hint:0,peek:false,draft:'',edit:false};draw()}
 function saveEdit(){const B=structuredClone(blocksOf(run.id));B[run.i]={h:document.getElementById('eh').value.trim()||null,t:document.getElementById('et').value};
   S.overrides[run.id]={blocks:B,u:now()};saveState();run.edit=false;draw()}
@@ -585,7 +633,7 @@ function ptick(){ptAdd();if(!pr)return;
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')PT.last=performance.now();else ptAdd()});
 
 function pNew(id){return {id,lv:pLevel(id),ph:'ready',i:0,res:[],draft:'',hdraft:'',g:null}}
-function pQueue(ids){ids=(ids||[]).filter(id=>BYID[id]);if(!ids.length)return;run=null;TM.on=false;pr={queue:ids,qi:0,...pNew(ids[0])};draw()}
+function pQueue(ids){ids=(ids||[]).filter(id=>BYID[id]);if(!ids.length)return;if(!pr&&!okNew('pr'))return;if(run)leaveSession();rd=null;run=null;TM.on=false;pr={queue:ids,qi:0,...pNew(ids[0])};draw()}
 function pNextQ(){const q=pr.queue,qi=pr.qi+1;pr={queue:q,qi,...pNew(q[qi])};draw()}
 function pBegin(){if(!pr)return;pr.ph='study';pr.allot=pAllot(blocksOf(pr.id)[pr.i],PLV[pr.lv]);pr.draft='';pr.hdraft='';pTimer(true);draw()}
 function endStudy(auto){if(!pr||pr.ph!=='study')return;ptAdd();
@@ -608,9 +656,12 @@ function pRecord(){const R=pr.res,tot=R.reduce((s,r)=>s+r.n,0)||1,u=uid();
 
 function vPress(){const it=BYID[pr.id],B=blocksOf(pr.id),spc=PLV[pr.lv];
   const qtxt=pr.queue.length>1?`<span class="pill">${pr.qi+1} / ${pr.queue.length} 理論目</span>`:'';
-  let h=`<div class="card"><div class="row"><div class="grow"><span class="kind k-speed">圧迫暗記</span>${itemLabel(it)}</div>${qtxt}${stars(it.stars)}<button class="b s" onclick="go('press')">${pr.ph==='done'?'閉じる':'中断'}</button></div>`;
+  let h=`<div class="card"><div class="row"><div class="grow"><span class="kind k-speed">圧迫暗記</span>${itemLabel(it)}</div>${qtxt}${stars(it.stars)}<button class="b s" onclick="${pr.ph==='done'?"go('press')":'quitAsk()'}">${pr.ph==='done'?'閉じる':'中断'}</button></div>`;
   if(pr.ph==='done')return h+vPDone()+'</div>';
   h+=`<div class="prog">${B.map((_,k)=>`<span class="${k<pr.res.length?(pr.res[k].pass?'ok':'ng'):k===pr.i?'cur':''}"></span>`).join('')}</div>`;
+  if(pr.ph==='ready'&&pr.i>0){const tot=B.slice(pr.i).reduce((s,b)=>s+pAllot(b,spc),0);
+    return h+`<p><b>中断したところから再開します。</b>区切り ${pr.i+1} / ${B.length} から（${spc.toFixed(1)}秒/字・残りの覚える時間 ${fmtSec(tot)}）。</p>
+     <div class="row"><button class="b p" id="nx" onclick="pBegin()">区切り ${pr.i+1} から再開 <kbd>Enter</kbd></button></div></div>`}
   if(pr.ph==='ready'){const tot=B.reduce((s,b)=>s+pAllot(b,spc),0),A=pAtt(pr.id);
     return h+`<p>区切りごとに、正解テキストが <b>${spc.toFixed(1)}秒/字</b> の時間だけ表示されます。時間が来ると隠れるので、すぐに思い出して書いてください。早く覚えられたら「覚えた」で先に進めます。</p>
      <div class="stats"><div class="stat"><span class="sub">区切り</span><b>${B.length}</b></div><div class="stat"><span class="sub">字数</span><b>${charsOf(pr.id)}</b></div>
@@ -624,8 +675,8 @@ function vPress(){const it=BYID[pr.id],B=blocksOf(pr.id),spc=PLV[pr.lv];
      <div class="bar cdb" style="margin:8px 0 10px"><i id="pbar" style="width:100%"></i></div><div class="studytext">${esc(tgt(b))}</div></div>`;
   if(pr.ph==='test')
     return h+`<div class="row" style="margin-bottom:6px"><span id="ptm" class="timer">テスト経過 0:00</span><span class="sub">覚えた時間 ${fmtSec(pr.study)}</span></div>
-     ${headLabel(b)?`<div class="field" style="margin-top:0"><label>見出し</label><input type="text" id="phead" value="${esc(pr.hdraft)}" placeholder="見出しを入力（例：課税の対象）" oninput="pr.hdraft=this.value" onkeydown="if(event.isComposing)return;if(event.key==='Enter'){event.preventDefault();if(event.ctrlKey||event.metaKey)pGrade();else document.getElementById('pans').focus()}"></div><label class="sub">本文</label>`:''}
-     <textarea id="pans" placeholder="今覚えた内容を入力" oninput="pr.draft=this.value" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();pGrade()}">${esc(pr.draft)}</textarea>
+     ${headLabel(b)?`<div class="field" style="margin-top:0"><label>見出し</label><input type="text" id="phead" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" value="${esc(pr.hdraft)}" placeholder="見出しを入力（例：課税の対象）" oninput="pr.hdraft=this.value" onkeydown="if(event.isComposing)return;if(event.key==='Enter'){event.preventDefault();if(event.ctrlKey||event.metaKey)pGrade();else document.getElementById('pans').focus()}"></div><label class="sub">本文</label>`:''}
+     <textarea id="pans" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="今覚えた内容を入力" oninput="pr.draft=this.value" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();pGrade()}">${esc(pr.draft)}</textarea>
      <div class="row" style="margin-top:10px"><button class="b p" onclick="pGrade()">採点 <kbd>Ctrl/⌘+Enter</kbd></button></div></div>`;
   const g=pr.g,pass=passOf(g);
   return h+`<div class="row" style="margin:6px 0 8px"><span class="big ${pass?'ok':'ng'}">${pass?'○':'×'} ${pct(g.acc)}</span>
@@ -644,12 +695,12 @@ function vPDone(){const a=pr.rec,more=pr.qi+1<pr.queue.length,nl=pLevel(pr.id),e
    <td class="n sub hide-sm">${r.study?Math.round(r.m/(r.study/60))+'字/分':''}</td><td>${r.pass?'<span class="ok">○</span>':'<span class="ng">×</span>'}${r.ai&&!r.ai.ok?' <span class="pill ng">意味NG</span>':''}${r.ai&&r.ai.kinki.length?' <span class="pill ng">禁忌違反</span>':''}</td></tr>`).join('')}</table>
   <p class="sub">この理論の覚えやすさ：${ez!=null?Math.round(ez)+'字/分 '+ezTag(easeClass(pr.id)):'–'}（これまでの圧迫暗記で、覚えるのに使った1分あたりに正しく書けた字数）</p>
   <div class="row">${more?`<button class="b p" id="nx" onclick="pNextQ()">次の理論へ（${pr.queue[pr.qi+1]}） <kbd>Enter</kbd></button>`:''}
-  <button class="b" onclick="pQueue(['${pr.id}'])">もう一度</button><button class="b" onclick="startQueue(['${pr.id}'])">通常の練習で記録する</button><button class="b" onclick="go('press')">圧迫暗記の一覧へ</button></div>`}
+  <button class="b" onclick="pQueue(['${pr.id}'])">もう一度</button><button class="b" onclick="startQueue(['${pr.id}'])">通常の練習で記録する</button><button class="b" onclick="openRead('${BYID[pr.id].q}','${pr.id}')">条文と解説を読む</button><button class="b" onclick="go('press')">圧迫暗記の一覧へ</button></div>`}
 
 function vPList(){const all=Object.values(PRA).flat().sort((a,b)=>b.ts-a.ts),done=ITEMS.filter(i=>pAtt(i.id).length);
   const p=planOf().filter(id=>BYID[id]),nextNew=[...ITEMS.filter(i=>i.stars>=2),...ITEMS.filter(i=>i.stars<2)].find(i=>!pAtt(i.id).length);
   const ezAll=easeRaw(all.flatMap(a=>a.blocks||[]));
-  let h=`<div class="card"><h2>圧迫暗記</h2><p class="sub" style="margin-top:0">区切りごとに、字数に応じた短い時間だけ正解テキストを表示し、隠したらすぐに書いてテストします。覚える時間は ${PLV.map(v=>v.toFixed(1)).join(' → ')} 秒/字 と、その理論で合格するたびに一段ずつ短くなります。
+  let h=vSuspCards()+`<div class="card"><h2>圧迫暗記</h2><p class="sub" style="margin-top:0">区切りごとに、字数に応じた短い時間だけ正解テキストを表示し、隠したらすぐに書いてテストします。覚える時間は ${PLV.map(v=>v.toFixed(1)).join(' → ')} 秒/字 と、その理論で合格するたびに一段ずつ短くなります。
    短い時間で覚えられた理論・区切りほど「覚えやすい」、時間をかけても書けない所ほど「覚えにくい」ものとしてデータが貯まります。</p>
    <p class="sub">この記録は通常の練習とは別に保存し、マップの色や復習間隔には影響しません（覚えにくい理論には、マップに <span class="ez ez-h">難</span> が付きます）。AIスケジュールにも覚えやすさを渡します。</p>
    <div class="row"><button class="b p" onclick="pQueue(${esc(JSON.stringify(p))})" ${p.length?'':'disabled'}>今日の予定を圧迫暗記（${p.length}件）</button>
@@ -856,11 +907,12 @@ function vSet(){const st=S.settings;
   <tr><td>見出しも覚える<div class="sub">オン：問いは「（1）」と番号だけ出し、「課税の対象」などの見出しも解答として書く／オフ：見出しを表示する</div></td><td><input type="checkbox" ${memHead()?'checked':''} onchange="setS('memHead',this.checked)"></td></tr></table>
   <p class="sub">合格＝一致率がしきい値以上 かつ AI判定で意味が通っている かつ 禁忌違反なし。空白・改行・全角半角の違いは常に無視します。</p></div>
 
-  <div class="card"><h2>データ</h2><p class="sub" style="margin-top:0">理論データ：${DATA?`${ITEMS.length}件（${esc(DATA.source||'')}）`:'未読み込み'}</p>
-  <div class="row"><label class="b">理論データ／バックアップを読み込む<input type="file" accept=".json,application/json" style="display:none" onchange="importData(this.files[0])"></label>
+  <div class="card"><h2>データ</h2><p class="sub" style="margin-top:0">理論データ：${DATA?`${ITEMS.length}件（${esc(DATA.source||'')}）`:'未読み込み'}<br>
+  解説データ（「読む」で表示する要旨・内容解説）：${NOTES?`${Object.keys(NOTES.notes).length}問題分`:notesLoaded?'未読み込み':'確認中…'}</p>
+  <div class="row"><label class="b">理論データ／解説データ／バックアップを読み込む<input type="file" accept=".json,application/json" style="display:none" onchange="importData(this.files[0])"></label>
   <button class="b" onclick="exportJSON()">記録のバックアップ（JSON）</button><button class="b" onclick="exportCSV()">練習履歴をCSVで書き出す</button></div>
   <p class="sub">旧版（HTMLファイル版）で書き出したバックアップJSONも読み込めます。</p></div>
-  <div class="card sub">消費税法 理論暗記 v2.2.3</div>`}
+  <div class="card sub">消費税法 理論暗記 v2.3</div>`}
 function setS(k,v){S.settings[k]=v;S.settings.u=now();saveState()}
 function saveAI(){C.apiKey=document.getElementById('ak').value.trim();C.model=document.getElementById('am').value;C.aiOn=document.getElementById('ao').checked;saveConf();toast('保存しました')}
 async function testAI(){saveAI();const el=document.getElementById('aitest');el.innerHTML='<span class="spin"></span> テスト中…';
@@ -880,9 +932,122 @@ function importBackup(d){if(!confirm('バックアップの記録を現在の記
     for(const k in d.plan||{})R.plan[k]={ids:d.plan[k],u:1};for(const k in d.overrides||{})R.overrides[k]={blocks:d.overrides[k].blocks,u:1}}
   S=merge(S,R);saveState();toast('統合しました');draw()}
 
+/* =========================================================
+   中断と再開
+   練習・圧迫暗記の途中経過を端末に保存しておき、あとで「続きから再開」できる。
+   画面を切り替えたとき・アプリを閉じたとき（裏に回ったとき）も自動で保存する。
+   - 練習：終わった区切りの結果・採点済みの区切り・書きかけの解答・経過時間をそのまま残す
+   - 圧迫暗記：終わった区切りの結果を残す。表示中・テスト中の区切りは、再開時に覚えるところからやり直す
+   ========================================================= */
+function runSnap(){if(!run||!BYID[run.id])return null;const n=blocksOf(run.id).length;
+  if(run.i>=n){const qi=run.qi+1;return qi<run.queue.length?{queue:run.queue,qi,id:run.queue[qi],i:0,res:[],graded:null,hint:0,peek:false,draft:'',tm:0}:null}
+  if(!(run.i>0||run.res.length||run.graded||(run.draft||'').trim()||run.qi>0))return null;
+  const g=run.graded?{...run.graded,...(run.graded.aiState==='pending'?{aiState:'error',aiErr:'中断したためAI判定が終わっていません'}:{})}:null;
+  return {queue:run.queue,qi:run.qi,id:run.id,i:run.i,res:run.res,graded:g,hint:run.hint,peek:run.peek,draft:run.draft||'',tm:g?0:TM.ms}}
+function prSnap(){if(!pr||!BYID[pr.id])return null;
+  if(pr.ph==='done'){const qi=pr.qi+1;return qi<pr.queue.length?{queue:pr.queue,qi,...pNew(pr.queue[qi])}:null}
+  if(!(pr.i>0||pr.res.length||pr.ph!=='ready'||pr.qi>0))return null;
+  const s={queue:pr.queue,qi:pr.qi,id:pr.id,lv:pr.lv,i:pr.i,res:pr.res,ph:'ready',draft:'',hdraft:'',g:null};
+  if(pr.ph==='graded'){s.ph='graded';s.allot=pr.allot;s.study=pr.study;
+    s.g={...pr.g,...(pr.g.aiState==='pending'?{aiState:'error',aiErr:'中断したためAI判定が終わっていません'}:{})}}
+  return s}
+function saveSusp(){if(!run&&!pr)return false;let saved=false;
+  if(run){if(TM.on)tick();const s=runSnap();if(s){SUSP.run={...s,at:now()};saved=true}else delete SUSP.run}
+  if(pr){const s=prSnap();if(s){SUSP.pr={...s,at:now()};saved=true}else delete SUSP.pr}
+  sv(K_SUSP,SUSP);return saved}
+let suspT=null;
+function suspSoon(){clearTimeout(suspT);suspT=setTimeout(()=>{if(run||pr)saveSusp()},1500)}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&(run||pr))saveSusp()});
+window.addEventListener('pagehide',()=>{if(run||pr)saveSusp()});
+function suspDesc(k){const s=SUSP[k];if(!s||!BYID[s.id])return null;const it=BYID[s.id],n=blocksOf(s.id).length;
+  const pos=k==='run'&&s.graded?`区切り ${s.i+1} / ${n}（採点済み）`:k==='pr'&&s.ph==='graded'?`区切り ${s.i+1} / ${n}（採点済み）`:`区切り ${s.i+1} / ${n} から`;
+  return {it,pos,q:s.queue.length>1?`（${s.qi+1} / ${s.queue.length} 理論目）`:''}}
+function vSuspCards(){let h='';
+  for(const [k,lab,fn] of [['run','練習','resumeRun'],['pr','圧迫暗記','resumePr']]){const d=suspDesc(k);if(!d)continue;const t=new Date(SUSP[k].at||now());
+    h+=`<div class="card susp"><div class="row"><div class="grow"><b>中断中の${lab}</b>　<b>${d.it.q}〔${d.it.no}〕</b> ${esc(d.it.title)}
+     <div class="sub">${d.pos}${d.q}・${t.getMonth()+1}/${t.getDate()} ${pad(t.getHours())}:${pad(t.getMinutes())} に中断</div></div>
+     <button class="b p" onclick="${fn}()">続きから再開</button><button class="b s" onclick="dropSusp('${k}')">破棄</button></div></div>`}
+  return h}
+function okNew(k){const d=suspDesc(k);if(!d)return true;
+  return confirm(`中断中の${k==='run'?'練習':'圧迫暗記'}があります（${d.it.q}〔${d.it.no}〕 ${d.it.title}・${d.pos}）。\n新しく始めると、中断中の途中経過は消えます。よろしいですか？\n（キャンセルすると、各画面の「続きから再開」で戻れます）`)}
+function dropSusp(k){if(!confirm('中断中の途中経過を破棄しますか？'))return;delete SUSP[k];sv(K_SUSP,SUSP);draw(1)}
+function resumeRun(){const s=SUSP.run;if(!s||!BYID[s.id]){delete SUSP.run;sv(K_SUSP,SUSP);draw(1);return}
+  pr=null;PT.on=false;rd=null;run={...s,edit:false};delete run.at;const n=blocksOf(run.id).length;if(run.i>n)run.i=n;
+  TM.ms=run.tm||0;TM.on=false;draw()}
+function resumePr(){const s=SUSP.pr;if(!s||!BYID[s.id]){delete SUSP.pr;sv(K_SUSP,SUSP);draw(1);return}
+  run=null;TM.on=false;rd=null;PT.on=false;pr={...s};delete pr.at;const n=blocksOf(pr.id).length;if(pr.i>=n){pr.i=Math.min(pr.res.length,n-1);pr.ph='ready';pr.g=null}
+  draw()}
+function quitAsk(){const isP=!!pr,R=pr||run;if(!R)return;const it=BYID[R.id],n=blocksOf(R.id).length,done=(R.res||[]).length;
+  const can=isP?prSnap():runSnap(),cur=isP&&(R.ph==='study'||R.ph==='test');
+  document.getElementById('sheetIn').innerHTML=`<h2>${isP?'圧迫暗記':'練習'}を中断</h2><div style="margin-bottom:8px">${itemLabel(it)}</div>
+   <p>${can?`区切り ${done} / ${n} まで終わっています。<b>保存して中断</b>すると、あとで「続きから再開」でこの続きから始められます（マップ・今日の暗記・読む・圧迫暗記の各画面に表示されます）。${cur?'<br><span class="sub">いま表示中・入力中の区切りは、再開したときに覚えるところからやり直します。</span>':''}${!isP&&(R.draft||'').trim()&&!R.graded?'<br><span class="sub">書きかけの解答と経過時間も保存します。</span>':''}`:'まだ保存する途中経過はありません。'}</p>
+   <div class="row"><button class="b p" onclick="quitSave()">${can?'保存して中断':'やめる'}</button>${can?`<button class="b danger" onclick="quitDiscard()">記録せずにやめる</button>`:''}<button class="b" onclick="closeSheet()">続ける</button></div>`;
+  document.getElementById('sheet').classList.add('on')}
+function quitSave(){document.getElementById('sheet').classList.remove('on');go(pr?'press':tab)}
+function quitDiscard(){if(!confirm('この途中経過を破棄します。よろしいですか？'))return;document.getElementById('sheet').classList.remove('on');
+  const back=pr?'press':tab;if(pr)delete SUSP.pr;if(run)delete SUSP.run;sv(K_SUSP,SUSP);run=null;TM.on=false;TM.ms=0;pr=null;PT.on=false;rd=null;tab=back;draw()}
+
+/* =========================================================
+   読む（条文＋テキストの解説）
+   条文（理論データ。テキスト修正があれば修正後）を見出しつきで表示し、
+   セクションごとに、テキストの「要旨」（図）と「内容解説」を載せる。
+   解説データは 解説データ.json（PDFから抽出：文章はテキスト、要旨・図解・まとめは画像）
+   ========================================================= */
+function openRead(q,focus){if(!QS.find(x=>x.q===q))return;leaveSession();closeSheetQuiet();tab='read';rd={q,jump:focus||null};C.lastRead={q,id:focus||''};saveConf();draw()}
+function closeSheetQuiet(){document.getElementById('sheet').classList.remove('on')}
+function notesOf(q){return NOTES&&NOTES.notes&&NOTES.notes[q]||null}
+/* 解説をセクション（〔n〕）ごとに振り分ける。どのセクションにも当たらないもの（概要など）は general */
+function notesMap(q){const N=notesOf(q);if(!N)return null;const nos=new Set(QS.find(x=>x.q===q).items.map(i=>+i.no)),m={general:{yoshi:[],items:[]}};
+  const put=(k,x)=>{const s=(x.secs||[]).filter(n=>nos.has(n));if(!s.length)m.general[k].push(x);else s.forEach(n=>{(m[n]=m[n]||{yoshi:[],items:[]})[k].push(x)})};
+  (N.yoshi||[]).forEach(y=>put('yoshi',y));(N.items||[]).forEach(i=>put('items',i));return m}
+/* 条文の行を、テキストのように字下げして表示する（①…は1段、イ・ロ…は2段、その下の文は一段深く） */
+function lawHTML(t){let lv=0;return t.split('\n').map(line=>{let L=null;
+    if(/^[⑴-⒇]/.test(line))L=0;else if(/^[①-⑳]/.test(line))L=1;else if(/^[イロハニホヘトチリヌ](?=[\s　]|[一-龥（])/.test(line))L=2;else if(/^（[0-9０-９]+）|^\([0-9]+\)/.test(line))L=3;
+    if(L!=null){lv=L;return `<div style="margin-left:${Math.max(0,L-1)*1.2}em">${esc(line)}</div>`}
+    return `<div style="margin-left:${lv*1.2}em;text-indent:1em">${esc(line)}</div>`}).join('')}
+const imgHTML=p=>`<img src="${p.img}" width="${p.w}" height="${p.h}" loading="lazy" alt="図">`;
+function noteBody(m){let h='';
+  if(m.yoshi.length)h+=`<div class="lab">要旨</div>`+m.yoshi.map(y=>y.parts.map(imgHTML).join('')).join('');
+  for(const it of m.items){h+=`<h4>${it.no?it.no+'．':''}${esc(it.head||'内容解説')} <span class="sub" style="font-weight:400">p.${it.page||''}</span></h4>`;
+    h+=it.parts.map(p=>p.type==='img'?imgHTML(p):p.type==='label'?`<div class="lab">${esc(p.text)}</div>`:`<p class="${/^[⑴-⒇①-⑳・※（「〔イロハニホヘ]/.test(p.text)?'ni':''}">${esc(p.text)}</p>`).join('')}
+  return h}
+function noteBox(m,title){if(!m||(!m.yoshi.length&&!m.items.length))return '';
+  return `<details class="note" ${C.readNotes!==false?'open':''}><summary>${title}（${[m.yoshi.length?'要旨':'',m.items.length?'内容解説 '+m.items.length+'件':''].filter(Boolean).join('・')}）</summary>${noteBody(m)}</details>`}
+function vReadList(){const lr=C.lastRead&&QS.find(x=>x.q===C.lastRead.q);
+  let h=vSuspCards()+`<div class="card"><h2>読む（条文と解説）</h2><p class="sub" style="margin-top:0">理論の条文を見出しつきで通して読めます。セクションごとに、テキストの「要旨」と「内容解説」も載せています。「本文を隠す」をオンにすると、見出しだけを見て思い出し、タップして答え合わせする読み方もできます。</p>
+   <div class="row">${lr?`<button class="b p" onclick="openRead('${lr.q}','${C.lastRead.id||''}')">続きから読む（問題 ${lr.q} ${esc(lr.qt)}）</button>`:''}</div>
+   ${!NOTES&&notesLoaded?`<p class="sub" style="margin-bottom:0">解説データが読み込まれていません。<b>解説データ.json</b> を読み込むと解説も表示されます（同期を設定済みなら、ほかの端末で読み込めば自動で届きます）。</p>
+   <div class="row" style="margin-top:6px"><label class="b">解説データを読み込む<input type="file" accept=".json,application/json" style="display:none" onchange="importData(this.files[0])"></label></div>`:''}</div><div class="card">`;
+  let lastCh='';
+  for(const q of QS){const ch=q.q.split('-')[0];if(ch!==lastCh){if(lastCh)h+=`</div>`;lastCh=ch;h+=`<div class="ch">${ch}　${esc(q.ch)}</div><div class="grid">`}
+    const N=notesOf(q.q),mx=Math.max(...q.items.map(i=>i.stars)),chars=q.items.reduce((s,i)=>s+charsOf(i.id),0);
+    h+=`<div class="tile" onclick="openRead('${q.q}')"><div class="no">${q.q} ${stars(mx)}</div><div class="tt">${esc(q.qt)}</div>
+      <div class="meta sub">${q.items.length}セクション・${chars}字${N&&N.pages&&N.pages.length?`<br>解説 p.${N.pages[0]}〜${N.pages[N.pages.length-1]}`:''}</div></div>`}
+  return h+`</div></div>`}
+function vRead(){const qi=QS.findIndex(x=>x.q===rd.q),q=QS[qi];if(!q){rd=null;return vReadList()}
+  const prev=QS[qi-1],next=QS[qi+1],nm=notesMap(q.q),hide=!!C.readHide,ids=esc(JSON.stringify(q.items.map(i=>i.id)));
+  let h=`<div class="card rnav"><div class="row"><button class="b s" onclick="rd=null;draw()">← 一覧</button><h2 class="grow" style="margin:0">問題 ${q.q}　${esc(q.qt)}</h2>
+    <button class="b s" ${prev?`onclick="openRead('${prev.q}')"`:'disabled'}>‹ 前の問題</button><button class="b s" ${next?`onclick="openRead('${next.q}')"`:'disabled'}>次の問題 ›</button></div>
+   <div class="row" style="margin-top:6px"><label class="sub"><input type="checkbox" ${C.readNotes!==false?'checked':''} onchange="C.readNotes=this.checked;saveConf();draw(1)"> 解説を開いて表示</label>
+    <label class="sub"><input type="checkbox" ${hide?'checked':''} onchange="C.readHide=this.checked;saveConf();draw(1)"> 本文を隠す（タップで表示）</label>
+    <span class="grow"></span><button class="b s p" onclick="startQueue(${ids})">この問題を練習</button><button class="b s" onclick="pQueue(${ids})">圧迫暗記</button></div></div>`;
+  if(!NOTES&&notesLoaded)h+=`<div class="card sub">解説データが未読み込みのため、条文だけを表示しています（「読む」の一覧画面か設定画面から <b>解説データ.json</b> を読み込めます）。</div>`;
+  if(nm)h+=noteBox(nm.general,'この問題の解説（概要など）').replace('<details class="note"','<details class="note card"');
+  for(const it of q.items){const B=blocksOf(it.id),st=itemStatus(it.id);
+    h+=`<div class="card rsec" id="sec-${it.id}"><h2 style="margin:0 0 4px">〔${it.no}〕 ${esc(it.title)} ${stars(it.stars)}</h2><div class="row">
+      <span class="sub grow">${st?`最新 <span class="${st.pass?'ok':'ng'}">${pct(st.acc)}</span>`:'未練習'}${pAtt(it.id).length?' '+ezTag(easeClass(it.id)):''}</span>
+      ${hide?`<button class="b s" onclick="document.querySelectorAll('#sec-${it.id} .rtext').forEach(e=>e.classList.remove('hid'))">すべて表示</button>`:''}
+      <button class="b s p" onclick="startQueue(['${it.id}'])">練習</button><button class="b s" onclick="pQueue(['${it.id}'])">圧迫</button></div>`;
+    for(const b of B)h+=`<div class="rblk">${b.h?`<div class="rh">${esc(b.h)}</div>`:''}<div class="rtext${hide?' hid':''}" onclick="this.classList.remove('hid')">${lawHTML(b.t)}</div></div>`;
+    if(nm)h+=noteBox(nm[+it.no],'解説');
+    h+=`</div>`}
+  h+=`<div class="row" style="justify-content:space-between">${prev?`<button class="b" onclick="openRead('${prev.q}')">‹ 問題 ${prev.q} ${esc(prev.qt)}</button>`:'<span></span>'}${next?`<button class="b p" onclick="openRead('${next.q}')">問題 ${next.q} ${esc(next.qt)} ›</button>`:''}</div>`;
+  return h}
+
 /* ---------- 起動 ---------- */
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
-draw();syncNow(false);
+draw();
+IDB.get('notes').then(n=>{NOTES=n||null}).catch(()=>{}).finally(()=>{notesLoaded=true;if(!run&&!pr&&(tab==='read'||tab==='set'))draw(1);syncNow(false)});
 </script>
 </body>
 </html>
